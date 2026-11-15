@@ -1,0 +1,222 @@
+diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
+--- a/pdf_viewer/input.cpp
++++ b/pdf_viewer/input.cpp
+@@ -2671,6 +2671,17 @@
+     std::vector<char> special_symbols() {
+         std::vector<char> res = { '_', };
+         return res;
++    }
++};
++
++class ExportHighlightsCommand : public Command {
++public:
++    static inline const std::string cname = "export_highlights";
++    static inline const std::string hname = "Export highlights and bookmarks of the current document to a Markdown file";
++    ExportHighlightsCommand(MainWidget* w) : Command(cname, w) {};
++
++    void perform() {
++        result = widget->handle_export_highlights();
+     }
+ };
+ 
+@@ -7290,6 +7301,7 @@
+     register_command<CopyScreenshotToScratchpad>();
+     register_command<CopyScreenshotToClipboard>();
+     register_command<AddHighlightCommand>();
++    register_command<ExportHighlightsCommand>();
+     register_command<GotoTableOfContentsCommand>();
+     register_command<GotoHighlightCommand>();
+     register_command<IncreaseFreetextBookmarkFontSizeCommand>();
+diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
+--- a/pdf_viewer/main_widget.cpp
++++ b/pdf_viewer/main_widget.cpp
+@@ -14,6 +14,7 @@
+ 
+ 
+ #include "coordinates.h"
++#include <algorithm>
+ #include <iostream>
+ #include <vector>
+ #include <string>
+@@ -2111,7 +2112,7 @@
+     if (has_document) {
+         //setWindowTitle(QString::fromStdWString(path.get_path()));
+         if (file_name.size() > 0) {
+-            setWindowTitle(file_name);
++            setWindowTitle(file_name + " · PaperNote");
+         }
+         else {
+             setWindowTitle(QString::fromStdWString(path));
+@@ -6147,7 +6148,111 @@
+         return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
+     }
+ }
++
++std::wstring MainWidget::handle_export_highlights() {
++    if (!main_document_view_has_document()) {
++        return L"";
++    }
++
++    Document* document = doc();
++    if (!document) {
++        return L"";
++    }
++
++    struct NoteEntry {
++        int page;
++        bool is_bookmark;
++        QString text;
++        QString note;
++    };
+ 
++    std::vector<NoteEntry> entries;
++
++    for (const Highlight& highlight : document->get_highlights()) {
++        NoteEntry entry;
++        entry.page = document->get_offset_page_number(highlight.selection_begin.y);
++        entry.is_bookmark = false;
++        entry.text = QString::fromStdWString(highlight.description).trimmed();
++        entry.note = QString::fromStdWString(highlight.text_annot).trimmed();
++        entries.push_back(entry);
++    }
++
++    for (const BookMark& bookmark : document->get_bookmarks()) {
++        NoteEntry entry;
++        entry.page = document->get_offset_page_number(bookmark.y_offset_);
++        entry.is_bookmark = true;
++        entry.text = QString::fromStdWString(bookmark.description).trimmed();
++        entries.push_back(entry);
++    }
++
++    if (entries.empty()) {
++        set_status_message(L"当前文档没有高亮或书签，无需导出");
++        return L"";
++    }
++
++    std::stable_sort(entries.begin(), entries.end(), [](const NoteEntry& lhs, const NoteEntry& rhs) {
++        if (lhs.page != rhs.page) {
++            return lhs.page < rhs.page;
++        }
++        return lhs.is_bookmark && !rhs.is_bookmark;
++    });
++
++    QFileInfo document_info(QString::fromStdWString(document->get_path()));
++    QString export_path = document_info.dir().filePath(document_info.completeBaseName() + ".notes.md");
++
++    int highlight_count = 0;
++    for (const NoteEntry& entry : entries) {
++        if (!entry.is_bookmark) {
++            highlight_count++;
++        }
++    }
++
++    QString markdown;
++    markdown += QString("# %1 · 阅读笔记\n\n").arg(document_info.completeBaseName());
++    markdown += QString("> 导出自 PaperNote（Sioyek 二次开发版） · %1\n\n")
++                    .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm"));
++    markdown += QString("高亮 %1 条 · 书签 %2 条\n\n")
++                    .arg(highlight_count)
++                    .arg(entries.size() - highlight_count);
++
++    int current_page = -1;
++    for (const NoteEntry& entry : entries) {
++        if (entry.page != current_page) {
++            markdown += QString("## 第 %1 页\n\n").arg(entry.page + 1);
++            current_page = entry.page;
++        }
++
++        if (entry.is_bookmark) {
++            markdown += QString("- **书签**：%1\n\n").arg(entry.text);
++        }
++        else {
++            QString quoted = entry.text;
++            quoted.replace("\n", "\n> ");
++            markdown += QString("> %1\n\n").arg(quoted);
++
++            if (!entry.note.isEmpty()) {
++                markdown += QString("**批注**：%1\n\n").arg(entry.note);
++            }
++        }
++    }
++
++    QFile export_file(export_path);
++    if (!export_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++        set_status_message(QString("导出失败：无法写入 %1").arg(export_path).toStdWString());
++        return L"";
++    }
++
++    export_file.write(markdown.toUtf8());
++    export_file.close();
++
++    set_status_message(QString("已导出 %1 条标注到 %2")
++                        .arg(entries.size())
++                        .arg(export_path)
++                        .toStdWString());
++
++    return export_path.toStdWString();
++}
++
+ void MainWidget::change_selected_highlight_type(char new_type) {
+     if (selected_highlight_index != -1) {
+         doc()->update_highlight_type(selected_highlight_index, new_type);
+diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
+--- a/pdf_viewer/main_widget.h
++++ b/pdf_viewer/main_widget.h
+@@ -660,6 +660,7 @@
+     void handle_show_marks();
+     void handle_goto_bookmark_global();
+     std::wstring handle_add_highlight(char symbol);
++    std::wstring handle_export_highlights();
+     void handle_goto_highlight();
+     void handle_goto_highlight_global();
+     void handle_goto_toc();
+diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config
+--- a/pdf_viewer/keys.config
++++ b/pdf_viewer/keys.config
+@@ -185,6 +185,9 @@
+ # Left click on a highlight and then press the `delete_highlight` shortcut to delete it.
+ delete_highlight dh
+ 
++# Export all highlights and bookmarks of the current document to <document>.notes.md (fork addition)
++export_highlights <C-E>
++
+ # Sets the highlight type to be used for other operations (the default highlight type is 'a')
+ #set_select_highlight_type
+ 
+diff --git a/pdf_viewer_build_config.pro b/pdf_viewer_build_config.pro
+--- a/pdf_viewer_build_config.pro
++++ b/pdf_viewer_build_config.pro
+@@ -154,7 +154,7 @@
+     QMAKE_CXXFLAGS += /MP
+ 
+     DEFINES += _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE NOMINMAX
+-    RC_ICONS = pdf_viewer\icon2.ico
++    RC_ICONS = resources\papernote.ico
+ 
+     LIBS += -Lmupdf\platform\win32\x64\Release -llibmupdf -Lzlib -lzlib
+ 
+@@ -214,7 +214,7 @@
+     LIBS += -ldl -L$$PWD/mupdf/build/release -lmupdf -lmupdf-third -lmupdf-threads -lz
+     CONFIG+=sdk_no_version_check
+     QMAKE_MACOSX_DEPLOYMENT_TARGET = 15
+-    ICON = pdf_viewer\icon2.ico
++    ICON = resources/papernote.icns
+     QMAKE_INFO_PLIST = resources/Info.plist
+     LIBS += -framework AppKit
+     OBJECTIVE_SOURCES += pdf_viewer/macos_specific.mm
+diff --git a/resources/Info.plist b/resources/Info.plist
+--- a/resources/Info.plist
++++ b/resources/Info.plist
+@@ -7,7 +7,11 @@
+ 	<key>CFBundleIconFile</key>
+ 	<string>@ICON@</string>
+ 	<key>CFBundleIdentifier</key>
+-	<string>info.sioyek.sioyek</string>
++	<string>io.github.lottshin.papernote</string>
++	<key>CFBundleName</key>
++	<string>PaperNote</string>
++	<key>CFBundleDisplayName</key>
++	<string>PaperNote</string>
+ 	<key>CFBundlePackageType</key>
+ 	<string>APPL</string>
+ 	<key>CFBundleSignature</key>

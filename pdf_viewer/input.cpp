@@ -2670,7 +2670,8 @@ public:
 
     std::vector<char> special_symbols() {
         std::vector<char> res = { '_', };
-        return res;    }
+        return res;
+    }
 };
 
 class ExportHighlightsCommand : public Command {
