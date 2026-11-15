@@ -43,7 +43,8 @@ QMAKE="$(brew --prefix qt@5)/bin/qmake" ./scripts/build_macos_dmg.sh
 
 Use `build_windows.bat non_portable` with Qt 5.15/6.x + MSVC, then compile
 `installer/windows/papernote.iss` with Inno Setup 6. The GitHub Actions workflow
-`.github/workflows/build-installers.yml` does both platforms automatically.
+`.github/workflows/build-installers.yml` builds the Windows installer automatically;
+the macOS DMG is produced by `scripts/build_macos_dmg.sh`.
 
 ## License
 

@@ -44,28 +44,3 @@ jobs:
         with:
           name: PaperNote-Windows-Setup
           path: dist/PaperNote-Setup-*.exe
-
-  macos:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Qt6 and build deps
-        run: |
-          brew install qtbase qtdeclarative qtsvg qtspeech harfbuzz
-          echo "$(brew --prefix qtbase)/bin" >> "$GITHUB_PATH"
-
-      - name: Build DMG
-        env:
-          QMAKE: /opt/homebrew/opt/qtbase/bin/qmake
-        run: |
-          chmod +x scripts/build_macos_dmg.sh
-          ./scripts/build_macos_dmg.sh
-
-      - name: Upload DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: PaperNote-macOS-DMG
-          path: dist/*.dmg
