@@ -10,12 +10,13 @@
 // Unknown strings fall back to the original English text, so the app keeps
 // working even if a new upstream command is added.
 
+#include <QHash>
 #include <QString>
 #include <string>
 #include <unordered_map>
 
 inline QString papernote_tr_menu(const QString& english) {
-    static const std::unordered_map<QString, QString> map = {
+    static const QHash<QString, QString> map = {
         {"File", "文件"},
         {"Window", "窗口"},
         {"View", "视图"},
@@ -34,8 +35,8 @@ inline QString papernote_tr_menu(const QString& english) {
         {"Ruler", "标尺"},
     };
 
-    auto it = map.find(english);
-    return it == map.end() ? english : it->second;
+    auto it = map.constFind(english);
+    return it == map.constEnd() ? english : it.value();
 }
 
 inline QString papernote_tr_command(const std::string& command, const QString& fallback) {
