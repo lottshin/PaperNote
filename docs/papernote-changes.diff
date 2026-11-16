@@ -479,11 +479,11 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    layout->setSpacing(10);
 +
 +    QLabel* title = new QLabel("PaperNote", &dialog);
-+    title->setStyleSheet("font-size: 28px; font-weight: 600; color: #ffffff;");
++    title->setStyleSheet("font-size: 28px; font-weight: 600; color: #1f1e1c;");
 +    QLabel* subtitle = new QLabel("继续阅读最近的文档，或打开新的 PDF", &dialog);
-+    subtitle->setStyleSheet("color: #a9a6ba; font-size: 13px;");
++    subtitle->setStyleSheet("color: #6f6a64; font-size: 13px;");
 +    layout->addWidget(title);
-+    layout->addSpacing(4);
++    layout->addSpacing(6);
 +    layout->addWidget(subtitle);
 +    layout->addSpacing(8);
 +
@@ -588,7 +588,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  
          if (key_mappings.size() > 0){
              action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
-@@ -11567,19 +11903,650 @@
+@@ -11567,19 +11903,654 @@
  
      }
      else {
@@ -605,8 +605,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    if (cmd) {
 +        handle_command_types(std::move(cmd), 0);
      }
-+}
-+
+ }
+ 
 +void MainWidget::goto_page_from_edit() {
 +    if (!page_number_edit) {
 +        return;
@@ -629,8 +629,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    document_tabs_bar->setMovable(false);
 +    document_tabs_bar->setFloatable(false);
 +    document_tabs_bar->setStyleSheet(
-+        "QToolBar#papernote_tabs_bar { background: #14131a; border: none;"
-+        " padding: 2px 10px 5px 10px; }"
++        "QToolBar#papernote_tabs_bar { background: #f7f6f4; border: none;"
++        " border-bottom: 1px solid #e7e3dd; padding: 2px 10px 0 10px; }"
 +    );
 +
 +    document_tabs = new QTabBar(document_tabs_bar);
@@ -640,13 +640,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    document_tabs->setElideMode(Qt::ElideRight);
 +    document_tabs->setStyleSheet(
 +        "QTabBar { background: transparent; }"
-+        "QTabBar::tab { background: #201f28; color: #b7b4c7; padding: 8px 16px; margin-right: 4px;"
-+        " border: 1px solid transparent; border-top-left-radius: 8px; border-top-right-radius: 8px;"
++        "QTabBar::tab { background: transparent; color: #6f6a64; padding: 8px 16px; margin-right: 2px;"
++        " border: none; border-top-left-radius: 8px; border-top-right-radius: 8px;"
 +        " max-width: 220px; }"
 +        "QTabBar::close-button { margin-left: 8px; }"
-+        "QTabBar::tab:selected { background: #2f2a3f; color: #ffffff;"
-+        " border-color: #4b4166; border-bottom: 2px solid #8b6cff; }"
-+        "QTabBar::tab:hover:!selected { background: #2a2833; }"
++        "QTabBar::tab:selected { background: #ffffff; color: #1f1e1c;"
++        " border-bottom: 2px solid #0075de; }"
++        "QTabBar::tab:hover:!selected { background: #efebe6; }"
 +    );
 +    document_tabs_bar->addWidget(document_tabs);
 +    addToolBarBreak(Qt::TopToolBarArea);
@@ -741,8 +741,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        }
 +        refresh_document_tabbar();
 +    });
- }
- 
++}
++
 +void MainWidget::refresh_document_tabbar() {
 +    if (!document_tabs || !document_tabs_bar) {
 +        return;
@@ -792,17 +792,18 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    layout->setSpacing(5);
 +
 +    QLabel* title = new QLabel("设置", &dialog);
-+    title->setStyleSheet("font-size: 24px; font-weight: 600; color: #ffffff;");
++    title->setStyleSheet("font-size: 26px; font-weight: 600; color: #1f1e1c;");
 +    QLabel* subtitle = new QLabel("修改会立即保存，对下次启动同样生效", &dialog);
-+    subtitle->setStyleSheet("color: #a9a6ba; font-size: 12px;");
++    subtitle->setStyleSheet("color: #6f6a64; font-size: 12px;");
 +    layout->addWidget(title);
 +    layout->addWidget(subtitle);
 +    layout->addSpacing(8);
 +
 +    auto add_section = [&](const QString& text) {
 +        QLabel* label = new QLabel(text, &dialog);
-+        label->setStyleSheet("color: #c9b8ff; font-size: 12.5px; font-weight: 700; margin-top: 14px;");
++        label->setStyleSheet("color: #6f6a64; font-size: 12px; font-weight: 600; margin-top: 12px;");
 +        layout->addWidget(label);
++        layout->addSpacing(3);
 +    };
 +
 +    auto add_toggle = [&](const QString& text, const wchar_t* config_name) {
@@ -857,9 +858,9 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        bool selected = (select_highlight_type == (char)('a' + i));
 +        highlight_swatches[i]->setStyleSheet(QString(
 +            "QToolButton { background: %1; border: %2; border-radius: 10px; }"
-+            "QToolButton:hover { border-color: #ffffff; }")
++            "QToolButton:hover { border-color: #0075de; }")
 +            .arg(color.name())
-+            .arg(selected ? QString("2px solid #ffffff") : QString("2px solid #1e1d26")));
++            .arg(selected ? QString("2px solid #0075de") : QString("2px solid #ffffff")));
 +    }
 +    last_highlight_swatch = select_highlight_type;
 +}
@@ -879,26 +880,27 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    sidebar->setMinimumWidth(220);
 +    sidebar->setMaximumWidth(320);
 +    sidebar->setTitleBarWidget(new QWidget(sidebar));
-+    sidebar->setStyleSheet("QDockWidget { background: #1a1920; }");
++    sidebar->setStyleSheet("QDockWidget { background: #f7f6f4; border-right: 1px solid #e7e3dd; }");
 +
 +    sidebar_tabs = new QTabWidget(sidebar);
 +    sidebar_tabs->setObjectName("papernote_sidebar_tabs");
 +    sidebar_tabs->setDocumentMode(true);
 +    sidebar_tabs->setStyleSheet(
-+        "QTabWidget::pane { border: none; background: #1a1920; }"
-+        "QTabBar::tab { background: transparent; color: #a9a6ba; padding: 7px 16px;"
++        "QTabWidget::pane { border: none; background: #f7f6f4; }"
++        "QTabBar::tab { background: transparent; color: #6f6a64; padding: 7px 16px;"
 +        " border-bottom: 2px solid transparent; }"
-+        "QTabBar::tab:selected { color: #ffffff; border-bottom: 2px solid #8b6cff; }"
-+        "QTabBar::tab:hover:!selected { color: #d8d5e6; }"
++        "QTabBar::tab:selected { color: #1f1e1c; border-bottom: 2px solid #0075de; }"
++        "QTabBar::tab:hover:!selected { color: #3c3a36; }"
 +    );
 +
 +    toc_tree = new QTreeWidget(sidebar_tabs);
 +    toc_tree->setObjectName("papernote_toc");
 +    toc_tree->setHeaderHidden(true);
 +    toc_tree->setStyleSheet(
-+        "QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; font-size: 12.5px; }"
++        "QTreeWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 12.5px; }"
 +        "QTreeWidget::item { padding: 5px 2px; }"
-+        "QTreeWidget::item:selected { background: #3a3350; }"
++        "QTreeWidget::item:hover { background: #efebe6; }"
++        "QTreeWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
 +    );
 +    QObject::connect(toc_tree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
 +        int page = item->data(0, Qt::UserRole).toInt();
@@ -916,9 +918,10 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    thumbnails->setMovement(QListView::Static);
 +    thumbnails->setSpacing(4);
 +    thumbnails->setStyleSheet(
-+        "QListWidget { background: #1a1920; border: none; color: #c9c6d8; font-size: 11.5px; }"
++        "QListWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 11.5px; }"
 +        "QListWidget::item { padding: 6px; border-radius: 8px; }"
-+        "QListWidget::item:selected { background: #3a3350; color: #ffffff; }"
++        "QListWidget::item:hover { background: #efebe6; }"
++        "QListWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
 +    );
 +    QObject::connect(thumbnails, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
 +        int page = item->data(Qt::UserRole).toInt();
@@ -1064,18 +1067,19 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    main_toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 +    main_toolbar->setIconSize(QSize(19, 19));
 +    main_toolbar->setStyleSheet(
-+        "QToolBar#papernote_toolbar { background: #1e1d26; border: none;"
-+        " padding: 5px 8px; spacing: 2px; }"
-+        "QToolBar#papernote_toolbar QToolButton { color: #e9e8f1; background: transparent;"
-+        " border: 1px solid transparent; border-radius: 7px; padding: 5px 10px; font-size: 12.5px; }"
-+        "QToolBar#papernote_toolbar QToolButton:disabled { color: #5f5c70; }"
-+        "QToolBar#papernote_toolbar QToolButton:hover { background: #2c2a36; border-color: #3f3c4e; }"
-+        "QToolBar#papernote_toolbar QToolButton:pressed { background: #24222c; }"
++        "QToolBar#papernote_toolbar { background: #ffffff; border: none;"
++        " border-bottom: 1px solid #e7e3dd; padding: 6px 10px; spacing: 2px; }"
++        "QToolBar#papernote_toolbar QToolButton { color: #3c3a36; background: transparent;"
++        " border: 1px solid transparent; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; }"
++        "QToolBar#papernote_toolbar QToolButton:disabled { color: #b9b4ad; }"
++        "QToolBar#papernote_toolbar QToolButton:hover { background: #f5f3f0; }"
++        "QToolBar#papernote_toolbar QToolButton:pressed { background: #efebe6; }"
 +        "QToolBar#papernote_toolbar QToolButton:checked {"
-+        " background: rgba(139, 108, 255, 0.30); border-color: #8b6cff; color: #ffffff; }"
-+        "QToolBar#papernote_toolbar::separator { width: 1px; background: #34323f; margin: 6px 9px; }"
-+        "QLineEdit { background: #17161d; color: #ecebf4; border: 1px solid #3a3847;"
-+        " border-radius: 7px; padding: 4px 6px; font-size: 12.5px; }"
++        " background: #e9f4fd; border-color: #bbddf7; color: #0b5fa5; }"
++        "QToolBar#papernote_toolbar::separator { width: 1px; background: #eae6e0; margin: 6px 9px; }"
++        "QLineEdit { background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;"
++        " border-radius: 8px; padding: 4px 8px; font-size: 12.5px; }"
++        "QLineEdit:focus { background: #ffffff; border-color: #0075de; }"
 +    );
 +
 +    auto add_button = [this](const QString& icon_name, const QString& text, const QString& tooltip,
@@ -1210,7 +1214,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        button->setToolTip(tooltip);
 +        button->setStyleSheet(
 +            "QToolButton { border: 1px solid transparent; border-radius: 6px; }"
-+            "QToolButton:hover { background: #2c2a36; border-color: #3f3c4e; }");
++            "QToolButton:hover { background: #f5f3f0; }");
 +        connect(button, &QToolButton::clicked, this, [this, command]() {
 +            run_ui_command(command);
 +        });
@@ -1240,7 +1244,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              new MenuNode{ "open_document", "", {}},
              new MenuNode { "open_prev_doc", "", {}},
              new MenuNode { "open_document_embedded", "", {}},
-@@ -11809,19 +12776,37 @@
+@@ -11809,19 +12780,37 @@
      auto command_key_mappings = input_handler->get_command_key_mappings();
      QMenuBar* menu_bar = new QMenuBar(this);
      for (auto top_level_menu : top_level_menus) {
@@ -1358,6 +1362,17 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 diff --git a/pdf_viewer/config.cpp b/pdf_viewer/config.cpp
 --- a/pdf_viewer/config.cpp
 +++ b/pdf_viewer/config.cpp
+@@ -14,8 +14,8 @@
+ float RULER_MARKER_COLOR[3] = { 1.0f, 0.0f, 0.0f };
+ float CUSTOM_BACKGROUND_COLOR[3] = { 0.18f, 0.204f, 0.251f };
+ float CUSTOM_TEXT_COLOR[3] = { 0.847f, 0.871f, 0.914f };
+-float STATUS_BAR_COLOR[3] = { 0.0f, 0.0f, 0.0f };
+-float STATUS_BAR_TEXT_COLOR[3] = { 1.0f, 1.0f, 1.0f };
++float STATUS_BAR_COLOR[3] = { 0.973f, 0.965f, 0.957f };
++float STATUS_BAR_TEXT_COLOR[3] = { 0.35f, 0.33f, 0.31f };
+ float UI_TEXT_COLOR[3] = { 1.0f, 1.0f, 1.0f };
+ float UI_BACKGROUND_COLOR[3] = { 0.0f, 0.0f, 0.0f };
+ float UI_SELECTED_TEXT_COLOR[3] = { 0.0f, 0.0f, 0.0f };
 @@ -229,9 +229,9 @@
  float SMOOTH_SCROLL_SPEED = 3.0f;
  float SMOOTH_SCROLL_DRAG = 3000.0f;
@@ -1370,6 +1385,19 @@ diff --git a/pdf_viewer/config.cpp b/pdf_viewer/config.cpp
  std::wstring CONTEXT_MENU_ITEMS_FOR_SELECTED_TEXT = L"copy|add_highlight(a)|add_highlight(b)|add_highlight(c)";
  std::wstring CONTEXT_MENU_ITEMS_FOR_LINKS = L"";
  std::wstring CONTEXT_MENU_ITEMS_FOR_HIGHLIGHTS = L"delete_highlight|edit_selected_annotation|add_highlight(a)|add_highlight(b)|add_highlight(c)";
+diff --git a/pdf_viewer/utils.cpp b/pdf_viewer/utils.cpp
+--- a/pdf_viewer/utils.cpp
++++ b/pdf_viewer/utils.cpp
+@@ -2677,7 +2677,8 @@
+ }
+ 
+ QString get_status_stylesheet(bool nofont, int font_size) {
+-    return get_color_stylesheet(STATUS_BAR_COLOR, STATUS_BAR_TEXT_COLOR, nofont, font_size);
++    return get_color_stylesheet(STATUS_BAR_COLOR, STATUS_BAR_TEXT_COLOR, nofont, font_size)
++        + " border-top: 1px solid #e7e3dd;";
+ }
+ 
+ QString get_list_item_stylesheet() {
 diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config
 --- a/pdf_viewer/keys.config
 +++ b/pdf_viewer/keys.config
@@ -1638,14 +1666,11 @@ diff --git a/pdf_viewer/papernote_theme.h b/pdf_viewer/papernote_theme.h
 new file mode 100644
 --- /dev/null
 +++ b/pdf_viewer/papernote_theme.h
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,245 @@
 +#pragma once
 +
-+// PaperNote visual theme.
-+//
-+// One place for the palette, the application-wide stylesheet and the small set
-+// of programmatically drawn toolbar icons. Keeping the icons vector-drawn (not
-+// bitmap assets) makes them crisp at any DPI and keeps the repo asset-free.
++// PaperNote visual theme — warm minimal (Notion / Craft style):
++// white canvas, warm neutral greys, whisper-thin borders, one blue accent.
 +
 +#include <QApplication>
 +#include <QColor>
@@ -1658,62 +1683,66 @@ new file mode 100644
 +
 +namespace papernote {
 +
-+inline const QColor kBg(0x14, 0x13, 0x1a);
-+inline const QColor kSurface(0x1e, 0x1d, 0x26);
-+inline const QColor kSurfaceAlt(0x26, 0x25, 0x30);
-+inline const QColor kBorder(0x36, 0x34, 0x42);
-+inline const QColor kText(0xf0, 0xef, 0xf6);
-+inline const QColor kTextMuted(0xa2, 0x9f, 0xb3);
-+inline const QColor kAccent(0x8b, 0x6c, 0xff);
-+inline const QColor kAccentHover(0x9d, 0x82, 0xff);
++inline const QColor kBg(0xff, 0xff, 0xff);
++inline const QColor kSurface(0xf7, 0xf6, 0xf4);
++inline const QColor kSurfaceAlt(0xf1, 0xef, 0xec);
++inline const QColor kBorder(0xe7, 0xe3, 0xdd);
++inline const QColor kText(0x1f, 0x1e, 0x1c);
++inline const QColor kTextMuted(0x6f, 0x6a, 0x64);
++inline const QColor kAccent(0x00, 0x75, 0xde);
++inline const QColor kAccentHover(0x00, 0x68, 0xc4);
++inline const QColor kAccentSoft(0xe9, 0xf4, 0xfd);
++inline const QColor kAccentText(0x0b, 0x5f, 0xa5);
 +
 +inline QString app_stylesheet() {
 +    return QStringLiteral(R"QSS(
 +QToolTip {
-+    background: #2a2834; color: #ecebf4; border: 1px solid #46435a;
++    background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;
 +    border-radius: 6px; padding: 5px 8px; font-size: 12px;
 +}
 +QMenu {
-+    background: #201f28; color: #e9e8f1; border: 1px solid #3a3847;
-+    border-radius: 8px; padding: 6px;
++    background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;
++    border-radius: 10px; padding: 6px;
 +}
-+QMenu::item { padding: 6px 26px 6px 14px; border-radius: 6px; }
-+QMenu::item:selected { background: #6d57a8; }
-+QMenu::separator { height: 1px; background: #34323f; margin: 5px 8px; }
-+QMessageBox, QDialog { background: #1c1b22; }
-+QMessageBox QLabel { color: #ecebf4; font-size: 13px; }
++QMenu::item { padding: 7px 28px 7px 14px; border-radius: 6px; }
++QMenu::item:selected { background: #e9f4fd; color: #0b5fa5; }
++QMenu::separator { height: 1px; background: #eeeae4; margin: 5px 8px; }
++QMessageBox, QDialog { background: #ffffff; }
++QMessageBox QLabel { color: #1f1e1c; font-size: 13px; }
 +QPushButton {
-+    background: #2f2d39; color: #ecebf4; border: 1px solid #46435a;
-+    border-radius: 7px; padding: 7px 16px; font-size: 13px;
++    background: #ffffff; color: #1f1e1c; border: 1px solid #ddd8d1;
++    border-radius: 8px; padding: 7px 16px; font-size: 13px;
 +}
-+QPushButton:hover { background: #3b3849; }
-+QPushButton:pressed { background: #2a2834; }
++QPushButton:hover { background: #f7f6f4; }
++QPushButton:pressed { background: #f1efec; }
 +QPushButton[primary="true"] {
-+    background: #8b6cff; color: #ffffff; border: 1px solid #9d82ff; font-weight: 600;
++    background: #0075de; color: #ffffff; border: 1px solid #0075de; font-weight: 600;
 +}
-+QPushButton[primary="true"]:hover { background: #9d82ff; }
++QPushButton[primary="true"]:hover { background: #0068c4; }
 +QPushButton[ghost="true"] {
-+    background: transparent; border-color: transparent; color: #b7b4c7;
++    background: transparent; border-color: transparent; color: #6f6a64;
 +}
-+QPushButton[ghost="true"]:hover { background: #2c2a36; color: #ffffff; }
-+QCheckBox { color: #e9e8f1; font-size: 13px; spacing: 8px; }
++QPushButton[ghost="true"]:hover { background: #f5f3f0; color: #1f1e1c; }
++QCheckBox { color: #1f1e1c; font-size: 13px; spacing: 8px; }
 +QLineEdit {
-+    background: #17161d; color: #ecebf4; border: 1px solid #3a3847;
-+    border-radius: 7px; padding: 5px 8px; selection-background-color: #6d57a8;
++    background: #f7f6f4; color: #1f1e1c; border: 1px solid transparent;
++    border-radius: 8px; padding: 5px 8px; selection-background-color: #cfe8fb;
 +}
++QLineEdit:focus { background: #ffffff; border-color: #0075de; }
 +QListWidget {
-+    background: #201f28; border: 1px solid #3a3847; border-radius: 9px;
-+    color: #e9e8f1; font-size: 13px;
++    background: #ffffff; border: 1px solid #e7e3dd; border-radius: 10px;
++    color: #1f1e1c; font-size: 13px;
 +}
-+QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #2c2a36; }
-+QListWidget::item:selected { background: #55467e; }
-+QTabWidget::pane { border: none; background: #1a1920; }
-+QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; }
++QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #f1efec; }
++QListWidget::item:hover { background: #f7f6f4; }
++QListWidget::item:selected { background: #f5f3f0; color: #1f1e1c; border-left: 3px solid #0075de; }
++QTabWidget::pane { border: none; background: #ffffff; }
++QTreeWidget { background: #ffffff; border: none; color: #1f1e1c; }
 +QTreeWidget::item { padding: 5px 2px; }
-+QTreeWidget::item:selected { background: #3a3350; }
++QTreeWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }
 +QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
-+QScrollBar::handle:vertical { background: #3f3c4e; border-radius: 4px; min-height: 28px; }
-+QScrollBar::handle:vertical:hover { background: #55506a; }
++QScrollBar::handle:vertical { background: #dcd7d0; border-radius: 4px; min-height: 28px; }
++QScrollBar::handle:vertical:hover { background: #c8c2b9; }
 +QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
 +QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
 +)QSS");
@@ -1723,14 +1752,14 @@ new file mode 100644
 +    QPalette palette = app.palette();
 +    palette.setColor(QPalette::Window, kBg);
 +    palette.setColor(QPalette::WindowText, kText);
-+    palette.setColor(QPalette::Base, kSurface);
-+    palette.setColor(QPalette::AlternateBase, kSurfaceAlt);
++    palette.setColor(QPalette::Base, QColor(Qt::white));
++    palette.setColor(QPalette::AlternateBase, kSurface);
 +    palette.setColor(QPalette::Text, kText);
-+    palette.setColor(QPalette::Button, kSurfaceAlt);
++    palette.setColor(QPalette::Button, QColor(Qt::white));
 +    palette.setColor(QPalette::ButtonText, kText);
 +    palette.setColor(QPalette::Highlight, kAccent);
 +    palette.setColor(QPalette::HighlightedText, QColor(Qt::white));
-+    palette.setColor(QPalette::ToolTipBase, kSurfaceAlt);
++    palette.setColor(QPalette::ToolTipBase, QColor(Qt::white));
 +    palette.setColor(QPalette::ToolTipText, kText);
 +    app.setPalette(palette);
 +
@@ -1744,7 +1773,7 @@ new file mode 100644
 +
 +    QPainter painter(&pixmap);
 +    painter.setRenderHint(QPainter::Antialiasing, true);
-+    QPen pen(color, size * 0.10, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
++    QPen pen(color, size * 0.09, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
 +    painter.setPen(pen);
 +    painter.setBrush(Qt::NoBrush);
 +

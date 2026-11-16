@@ -1,10 +1,7 @@
 #pragma once
 
-// PaperNote visual theme.
-//
-// One place for the palette, the application-wide stylesheet and the small set
-// of programmatically drawn toolbar icons. Keeping the icons vector-drawn (not
-// bitmap assets) makes them crisp at any DPI and keeps the repo asset-free.
+// PaperNote visual theme — warm minimal (Notion / Craft style):
+// white canvas, warm neutral greys, whisper-thin borders, one blue accent.
 
 #include <QApplication>
 #include <QColor>
@@ -17,62 +14,66 @@
 
 namespace papernote {
 
-inline const QColor kBg(0x14, 0x13, 0x1a);
-inline const QColor kSurface(0x1e, 0x1d, 0x26);
-inline const QColor kSurfaceAlt(0x26, 0x25, 0x30);
-inline const QColor kBorder(0x36, 0x34, 0x42);
-inline const QColor kText(0xf0, 0xef, 0xf6);
-inline const QColor kTextMuted(0xa2, 0x9f, 0xb3);
-inline const QColor kAccent(0x8b, 0x6c, 0xff);
-inline const QColor kAccentHover(0x9d, 0x82, 0xff);
+inline const QColor kBg(0xff, 0xff, 0xff);
+inline const QColor kSurface(0xf7, 0xf6, 0xf4);
+inline const QColor kSurfaceAlt(0xf1, 0xef, 0xec);
+inline const QColor kBorder(0xe7, 0xe3, 0xdd);
+inline const QColor kText(0x1f, 0x1e, 0x1c);
+inline const QColor kTextMuted(0x6f, 0x6a, 0x64);
+inline const QColor kAccent(0x00, 0x75, 0xde);
+inline const QColor kAccentHover(0x00, 0x68, 0xc4);
+inline const QColor kAccentSoft(0xe9, 0xf4, 0xfd);
+inline const QColor kAccentText(0x0b, 0x5f, 0xa5);
 
 inline QString app_stylesheet() {
     return QStringLiteral(R"QSS(
 QToolTip {
-    background: #2a2834; color: #ecebf4; border: 1px solid #46435a;
+    background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;
     border-radius: 6px; padding: 5px 8px; font-size: 12px;
 }
 QMenu {
-    background: #201f28; color: #e9e8f1; border: 1px solid #3a3847;
-    border-radius: 8px; padding: 6px;
+    background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;
+    border-radius: 10px; padding: 6px;
 }
-QMenu::item { padding: 6px 26px 6px 14px; border-radius: 6px; }
-QMenu::item:selected { background: #6d57a8; }
-QMenu::separator { height: 1px; background: #34323f; margin: 5px 8px; }
-QMessageBox, QDialog { background: #1c1b22; }
-QMessageBox QLabel { color: #ecebf4; font-size: 13px; }
+QMenu::item { padding: 7px 28px 7px 14px; border-radius: 6px; }
+QMenu::item:selected { background: #e9f4fd; color: #0b5fa5; }
+QMenu::separator { height: 1px; background: #eeeae4; margin: 5px 8px; }
+QMessageBox, QDialog { background: #ffffff; }
+QMessageBox QLabel { color: #1f1e1c; font-size: 13px; }
 QPushButton {
-    background: #2f2d39; color: #ecebf4; border: 1px solid #46435a;
-    border-radius: 7px; padding: 7px 16px; font-size: 13px;
+    background: #ffffff; color: #1f1e1c; border: 1px solid #ddd8d1;
+    border-radius: 8px; padding: 7px 16px; font-size: 13px;
 }
-QPushButton:hover { background: #3b3849; }
-QPushButton:pressed { background: #2a2834; }
+QPushButton:hover { background: #f7f6f4; }
+QPushButton:pressed { background: #f1efec; }
 QPushButton[primary="true"] {
-    background: #8b6cff; color: #ffffff; border: 1px solid #9d82ff; font-weight: 600;
+    background: #0075de; color: #ffffff; border: 1px solid #0075de; font-weight: 600;
 }
-QPushButton[primary="true"]:hover { background: #9d82ff; }
+QPushButton[primary="true"]:hover { background: #0068c4; }
 QPushButton[ghost="true"] {
-    background: transparent; border-color: transparent; color: #b7b4c7;
+    background: transparent; border-color: transparent; color: #6f6a64;
 }
-QPushButton[ghost="true"]:hover { background: #2c2a36; color: #ffffff; }
-QCheckBox { color: #e9e8f1; font-size: 13px; spacing: 8px; }
+QPushButton[ghost="true"]:hover { background: #f5f3f0; color: #1f1e1c; }
+QCheckBox { color: #1f1e1c; font-size: 13px; spacing: 8px; }
 QLineEdit {
-    background: #17161d; color: #ecebf4; border: 1px solid #3a3847;
-    border-radius: 7px; padding: 5px 8px; selection-background-color: #6d57a8;
+    background: #f7f6f4; color: #1f1e1c; border: 1px solid transparent;
+    border-radius: 8px; padding: 5px 8px; selection-background-color: #cfe8fb;
 }
+QLineEdit:focus { background: #ffffff; border-color: #0075de; }
 QListWidget {
-    background: #201f28; border: 1px solid #3a3847; border-radius: 9px;
-    color: #e9e8f1; font-size: 13px;
+    background: #ffffff; border: 1px solid #e7e3dd; border-radius: 10px;
+    color: #1f1e1c; font-size: 13px;
 }
-QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #2c2a36; }
-QListWidget::item:selected { background: #55467e; }
-QTabWidget::pane { border: none; background: #1a1920; }
-QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; }
+QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #f1efec; }
+QListWidget::item:hover { background: #f7f6f4; }
+QListWidget::item:selected { background: #f5f3f0; color: #1f1e1c; border-left: 3px solid #0075de; }
+QTabWidget::pane { border: none; background: #ffffff; }
+QTreeWidget { background: #ffffff; border: none; color: #1f1e1c; }
 QTreeWidget::item { padding: 5px 2px; }
-QTreeWidget::item:selected { background: #3a3350; }
+QTreeWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }
 QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
-QScrollBar::handle:vertical { background: #3f3c4e; border-radius: 4px; min-height: 28px; }
-QScrollBar::handle:vertical:hover { background: #55506a; }
+QScrollBar::handle:vertical { background: #dcd7d0; border-radius: 4px; min-height: 28px; }
+QScrollBar::handle:vertical:hover { background: #c8c2b9; }
 QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
 QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
 )QSS");
@@ -82,14 +83,14 @@ inline void apply_app_theme(QApplication& app) {
     QPalette palette = app.palette();
     palette.setColor(QPalette::Window, kBg);
     palette.setColor(QPalette::WindowText, kText);
-    palette.setColor(QPalette::Base, kSurface);
-    palette.setColor(QPalette::AlternateBase, kSurfaceAlt);
+    palette.setColor(QPalette::Base, QColor(Qt::white));
+    palette.setColor(QPalette::AlternateBase, kSurface);
     palette.setColor(QPalette::Text, kText);
-    palette.setColor(QPalette::Button, kSurfaceAlt);
+    palette.setColor(QPalette::Button, QColor(Qt::white));
     palette.setColor(QPalette::ButtonText, kText);
     palette.setColor(QPalette::Highlight, kAccent);
     palette.setColor(QPalette::HighlightedText, QColor(Qt::white));
-    palette.setColor(QPalette::ToolTipBase, kSurfaceAlt);
+    palette.setColor(QPalette::ToolTipBase, QColor(Qt::white));
     palette.setColor(QPalette::ToolTipText, kText);
     app.setPalette(palette);
 
@@ -103,7 +104,7 @@ inline QIcon icon(const QString& name, const QColor& color = kText, int size = 6
 
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    QPen pen(color, size * 0.10, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    QPen pen(color, size * 0.09, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
 

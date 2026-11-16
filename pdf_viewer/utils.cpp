@@ -2677,7 +2677,8 @@ QString get_ui_stylesheet(bool nofont, int font_size) {
 }
 
 QString get_status_stylesheet(bool nofont, int font_size) {
-    return get_color_stylesheet(STATUS_BAR_COLOR, STATUS_BAR_TEXT_COLOR, nofont, font_size);
+    return get_color_stylesheet(STATUS_BAR_COLOR, STATUS_BAR_TEXT_COLOR, nofont, font_size)
+        + " border-top: 1px solid #e7e3dd;";
 }
 
 QString get_list_item_stylesheet() {

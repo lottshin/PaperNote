@@ -6394,11 +6394,11 @@ void MainWidget::show_home_dialog(bool auto_show) {
     layout->setSpacing(10);
 
     QLabel* title = new QLabel("PaperNote", &dialog);
-    title->setStyleSheet("font-size: 28px; font-weight: 600; color: #ffffff;");
+    title->setStyleSheet("font-size: 28px; font-weight: 600; color: #1f1e1c;");
     QLabel* subtitle = new QLabel("继续阅读最近的文档，或打开新的 PDF", &dialog);
-    subtitle->setStyleSheet("color: #a9a6ba; font-size: 13px;");
+    subtitle->setStyleSheet("color: #6f6a64; font-size: 13px;");
     layout->addWidget(title);
-    layout->addSpacing(4);
+    layout->addSpacing(6);
     layout->addWidget(subtitle);
     layout->addSpacing(8);
 
@@ -11939,8 +11939,8 @@ void MainWidget::create_document_tabbar() {
     document_tabs_bar->setMovable(false);
     document_tabs_bar->setFloatable(false);
     document_tabs_bar->setStyleSheet(
-        "QToolBar#papernote_tabs_bar { background: #14131a; border: none;"
-        " padding: 2px 10px 5px 10px; }"
+        "QToolBar#papernote_tabs_bar { background: #f7f6f4; border: none;"
+        " border-bottom: 1px solid #e7e3dd; padding: 2px 10px 0 10px; }"
     );
 
     document_tabs = new QTabBar(document_tabs_bar);
@@ -11950,13 +11950,13 @@ void MainWidget::create_document_tabbar() {
     document_tabs->setElideMode(Qt::ElideRight);
     document_tabs->setStyleSheet(
         "QTabBar { background: transparent; }"
-        "QTabBar::tab { background: #201f28; color: #b7b4c7; padding: 8px 16px; margin-right: 4px;"
-        " border: 1px solid transparent; border-top-left-radius: 8px; border-top-right-radius: 8px;"
+        "QTabBar::tab { background: transparent; color: #6f6a64; padding: 8px 16px; margin-right: 2px;"
+        " border: none; border-top-left-radius: 8px; border-top-right-radius: 8px;"
         " max-width: 220px; }"
         "QTabBar::close-button { margin-left: 8px; }"
-        "QTabBar::tab:selected { background: #2f2a3f; color: #ffffff;"
-        " border-color: #4b4166; border-bottom: 2px solid #8b6cff; }"
-        "QTabBar::tab:hover:!selected { background: #2a2833; }"
+        "QTabBar::tab:selected { background: #ffffff; color: #1f1e1c;"
+        " border-bottom: 2px solid #0075de; }"
+        "QTabBar::tab:hover:!selected { background: #efebe6; }"
     );
     document_tabs_bar->addWidget(document_tabs);
     addToolBarBreak(Qt::TopToolBarArea);
@@ -12102,17 +12102,18 @@ void MainWidget::show_preferences_dialog() {
     layout->setSpacing(5);
 
     QLabel* title = new QLabel("设置", &dialog);
-    title->setStyleSheet("font-size: 24px; font-weight: 600; color: #ffffff;");
+    title->setStyleSheet("font-size: 26px; font-weight: 600; color: #1f1e1c;");
     QLabel* subtitle = new QLabel("修改会立即保存，对下次启动同样生效", &dialog);
-    subtitle->setStyleSheet("color: #a9a6ba; font-size: 12px;");
+    subtitle->setStyleSheet("color: #6f6a64; font-size: 12px;");
     layout->addWidget(title);
     layout->addWidget(subtitle);
     layout->addSpacing(8);
 
     auto add_section = [&](const QString& text) {
         QLabel* label = new QLabel(text, &dialog);
-        label->setStyleSheet("color: #c9b8ff; font-size: 12.5px; font-weight: 700; margin-top: 14px;");
+        label->setStyleSheet("color: #6f6a64; font-size: 12px; font-weight: 600; margin-top: 12px;");
         layout->addWidget(label);
+        layout->addSpacing(3);
     };
 
     auto add_toggle = [&](const QString& text, const wchar_t* config_name) {
@@ -12167,9 +12168,9 @@ void MainWidget::update_highlight_swatch_state() {
         bool selected = (select_highlight_type == (char)('a' + i));
         highlight_swatches[i]->setStyleSheet(QString(
             "QToolButton { background: %1; border: %2; border-radius: 10px; }"
-            "QToolButton:hover { border-color: #ffffff; }")
+            "QToolButton:hover { border-color: #0075de; }")
             .arg(color.name())
-            .arg(selected ? QString("2px solid #ffffff") : QString("2px solid #1e1d26")));
+            .arg(selected ? QString("2px solid #0075de") : QString("2px solid #ffffff")));
     }
     last_highlight_swatch = select_highlight_type;
 }
@@ -12189,26 +12190,27 @@ void MainWidget::create_sidebar() {
     sidebar->setMinimumWidth(220);
     sidebar->setMaximumWidth(320);
     sidebar->setTitleBarWidget(new QWidget(sidebar));
-    sidebar->setStyleSheet("QDockWidget { background: #1a1920; }");
+    sidebar->setStyleSheet("QDockWidget { background: #f7f6f4; border-right: 1px solid #e7e3dd; }");
 
     sidebar_tabs = new QTabWidget(sidebar);
     sidebar_tabs->setObjectName("papernote_sidebar_tabs");
     sidebar_tabs->setDocumentMode(true);
     sidebar_tabs->setStyleSheet(
-        "QTabWidget::pane { border: none; background: #1a1920; }"
-        "QTabBar::tab { background: transparent; color: #a9a6ba; padding: 7px 16px;"
+        "QTabWidget::pane { border: none; background: #f7f6f4; }"
+        "QTabBar::tab { background: transparent; color: #6f6a64; padding: 7px 16px;"
         " border-bottom: 2px solid transparent; }"
-        "QTabBar::tab:selected { color: #ffffff; border-bottom: 2px solid #8b6cff; }"
-        "QTabBar::tab:hover:!selected { color: #d8d5e6; }"
+        "QTabBar::tab:selected { color: #1f1e1c; border-bottom: 2px solid #0075de; }"
+        "QTabBar::tab:hover:!selected { color: #3c3a36; }"
     );
 
     toc_tree = new QTreeWidget(sidebar_tabs);
     toc_tree->setObjectName("papernote_toc");
     toc_tree->setHeaderHidden(true);
     toc_tree->setStyleSheet(
-        "QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; font-size: 12.5px; }"
+        "QTreeWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 12.5px; }"
         "QTreeWidget::item { padding: 5px 2px; }"
-        "QTreeWidget::item:selected { background: #3a3350; }"
+        "QTreeWidget::item:hover { background: #efebe6; }"
+        "QTreeWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
     );
     QObject::connect(toc_tree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
         int page = item->data(0, Qt::UserRole).toInt();
@@ -12226,9 +12228,10 @@ void MainWidget::create_sidebar() {
     thumbnails->setMovement(QListView::Static);
     thumbnails->setSpacing(4);
     thumbnails->setStyleSheet(
-        "QListWidget { background: #1a1920; border: none; color: #c9c6d8; font-size: 11.5px; }"
+        "QListWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 11.5px; }"
         "QListWidget::item { padding: 6px; border-radius: 8px; }"
-        "QListWidget::item:selected { background: #3a3350; color: #ffffff; }"
+        "QListWidget::item:hover { background: #efebe6; }"
+        "QListWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
     );
     QObject::connect(thumbnails, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
         int page = item->data(Qt::UserRole).toInt();
@@ -12374,18 +12377,19 @@ void MainWidget::create_main_toolbar() {
     main_toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
     main_toolbar->setIconSize(QSize(19, 19));
     main_toolbar->setStyleSheet(
-        "QToolBar#papernote_toolbar { background: #1e1d26; border: none;"
-        " padding: 5px 8px; spacing: 2px; }"
-        "QToolBar#papernote_toolbar QToolButton { color: #e9e8f1; background: transparent;"
-        " border: 1px solid transparent; border-radius: 7px; padding: 5px 10px; font-size: 12.5px; }"
-        "QToolBar#papernote_toolbar QToolButton:disabled { color: #5f5c70; }"
-        "QToolBar#papernote_toolbar QToolButton:hover { background: #2c2a36; border-color: #3f3c4e; }"
-        "QToolBar#papernote_toolbar QToolButton:pressed { background: #24222c; }"
+        "QToolBar#papernote_toolbar { background: #ffffff; border: none;"
+        " border-bottom: 1px solid #e7e3dd; padding: 6px 10px; spacing: 2px; }"
+        "QToolBar#papernote_toolbar QToolButton { color: #3c3a36; background: transparent;"
+        " border: 1px solid transparent; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; }"
+        "QToolBar#papernote_toolbar QToolButton:disabled { color: #b9b4ad; }"
+        "QToolBar#papernote_toolbar QToolButton:hover { background: #f5f3f0; }"
+        "QToolBar#papernote_toolbar QToolButton:pressed { background: #efebe6; }"
         "QToolBar#papernote_toolbar QToolButton:checked {"
-        " background: rgba(139, 108, 255, 0.30); border-color: #8b6cff; color: #ffffff; }"
-        "QToolBar#papernote_toolbar::separator { width: 1px; background: #34323f; margin: 6px 9px; }"
-        "QLineEdit { background: #17161d; color: #ecebf4; border: 1px solid #3a3847;"
-        " border-radius: 7px; padding: 4px 6px; font-size: 12.5px; }"
+        " background: #e9f4fd; border-color: #bbddf7; color: #0b5fa5; }"
+        "QToolBar#papernote_toolbar::separator { width: 1px; background: #eae6e0; margin: 6px 9px; }"
+        "QLineEdit { background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;"
+        " border-radius: 8px; padding: 4px 8px; font-size: 12.5px; }"
+        "QLineEdit:focus { background: #ffffff; border-color: #0075de; }"
     );
 
     auto add_button = [this](const QString& icon_name, const QString& text, const QString& tooltip,
@@ -12520,7 +12524,7 @@ void MainWidget::create_main_toolbar() {
         button->setToolTip(tooltip);
         button->setStyleSheet(
             "QToolButton { border: 1px solid transparent; border-radius: 6px; }"
-            "QToolButton:hover { background: #2c2a36; border-color: #3f3c4e; }");
+            "QToolButton:hover { background: #f5f3f0; }");
         connect(button, &QToolButton::clicked, this, [this, command]() {
             run_ui_command(command);
         });
