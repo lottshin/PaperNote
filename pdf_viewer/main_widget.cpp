@@ -15,6 +15,7 @@
 
 #include "coordinates.h"
 #include "ui_translation.h"
+#include "papernote_theme.h"
 #include <algorithm>
 #include <iostream>
 #include <vector>
@@ -6354,6 +6355,9 @@ void MainWidget::show_home_dialog(bool auto_show) {
             name = QFileInfo(path).fileName();
         }
 
+        if (name.size() > 42) {
+            name = name.left(42) + QString::fromUtf8("…");
+        }
         entries.push_back({path, name});
         if (entries.size() >= 12) {
             break;
@@ -6368,17 +6372,6 @@ void MainWidget::show_home_dialog(bool auto_show) {
     QDialog dialog(this);
     dialog.setWindowTitle("PaperNote");
     dialog.setMinimumSize(640, 480);
-    dialog.setStyleSheet(
-        "QDialog { background: #1c1b22; }"
-        "QLabel { color: #ececf2; }"
-        "QListWidget { background: #26252e; border: 1px solid #383643; border-radius: 8px;"
-        " color: #e8e8ee; font-size: 13px; }"
-        "QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #302e3a; }"
-        "QListWidget::item:selected { background: #574a7d; }"
-        "QPushButton { background: #35323f; color: #e8e8ee; border: 1px solid #4a4757;"
-        " border-radius: 7px; padding: 8px 18px; font-size: 13px; }"
-        "QPushButton:hover { background: #423e50; }"
-    );
 
     QVBoxLayout* layout = new QVBoxLayout(&dialog);
     layout->setContentsMargins(24, 22, 24, 20);
@@ -6389,13 +6382,21 @@ void MainWidget::show_home_dialog(bool auto_show) {
     QLabel* subtitle = new QLabel("继续阅读最近的文档，或打开新的 PDF", &dialog);
     subtitle->setStyleSheet("color: #a9a6ba; font-size: 13px;");
     layout->addWidget(title);
+    layout->addSpacing(4);
     layout->addWidget(subtitle);
+    layout->addSpacing(8);
 
     QListWidget* list = new QListWidget(&dialog);
+    list->setWordWrap(false);
+    list->setTextElideMode(Qt::ElideRight);
+    list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    list->setUniformItemSizes(true);
     for (const RecentEntry& entry : entries) {
-        QListWidgetItem* item = new QListWidgetItem(entry.title + "\n" + entry.path, list);
+        QListWidgetItem* item = new QListWidgetItem(entry.title, list);
+        item->setIcon(papernote::icon("page", papernote::kTextMuted, 36));
         item->setData(Qt::UserRole, entry.path);
         item->setToolTip(entry.path);
+        item->setSizeHint(QSize(0, 44));
     }
     if (entries.empty()) {
         QListWidgetItem* item = new QListWidgetItem("还没有最近打开的文档，点击下方「打开 PDF…」开始", list);
@@ -6408,8 +6409,11 @@ void MainWidget::show_home_dialog(bool auto_show) {
 
     QHBoxLayout* buttons = new QHBoxLayout();
     QPushButton* open_button = new QPushButton("打开 PDF…", &dialog);
+    open_button->setProperty("primary", true);
     QPushButton* help_button = new QPushButton("快速上手", &dialog);
+    help_button->setProperty("ghost", true);
     QPushButton* close_button = new QPushButton("关闭", &dialog);
+    close_button->setProperty("ghost", true);
     buttons->addWidget(open_button);
     buttons->addStretch();
     buttons->addWidget(help_button);
@@ -6448,6 +6452,7 @@ void MainWidget::show_quickstart_dialog() {
     QPushButton* open_document_button = nullptr;
     if (!main_document_view_has_document()) {
         open_document_button = message_box.addButton("打开 PDF", QMessageBox::AcceptRole);
+        open_document_button->setProperty("primary", true);
     }
     message_box.addButton("知道了", QMessageBox::RejectRole);
     message_box.exec();
@@ -11918,7 +11923,8 @@ void MainWidget::create_document_tabbar() {
     document_tabs_bar->setMovable(false);
     document_tabs_bar->setFloatable(false);
     document_tabs_bar->setStyleSheet(
-        "QToolBar { background: #1d1c23; border: none; padding: 0px 8px 4px 8px; }"
+        "QToolBar#papernote_tabs_bar { background: #14131a; border: none;"
+        " padding: 2px 10px 5px 10px; }"
     );
 
     document_tabs = new QTabBar(document_tabs_bar);
@@ -11927,10 +11933,14 @@ void MainWidget::create_document_tabbar() {
     document_tabs->setTabsClosable(true);
     document_tabs->setElideMode(Qt::ElideRight);
     document_tabs->setStyleSheet(
-        "QTabBar::tab { background: #2a2933; color: #cfcddb; padding: 6px 14px; margin-right: 2px;"
-        " border-top-left-radius: 6px; border-top-right-radius: 6px; max-width: 220px; }"
-        "QTabBar::tab:selected { background: #4b3f6b; color: #ffffff; }"
-        "QTabBar::tab:hover { background: #35323f; }"
+        "QTabBar { background: transparent; }"
+        "QTabBar::tab { background: #201f28; color: #b7b4c7; padding: 8px 16px; margin-right: 4px;"
+        " border: 1px solid transparent; border-top-left-radius: 8px; border-top-right-radius: 8px;"
+        " max-width: 220px; }"
+        "QTabBar::close-button { margin-left: 8px; }"
+        "QTabBar::tab:selected { background: #2f2a3f; color: #ffffff;"
+        " border-color: #4b4166; border-bottom: 2px solid #8b6cff; }"
+        "QTabBar::tab:hover:!selected { background: #2a2833; }"
     );
     document_tabs_bar->addWidget(document_tabs);
     addToolBarBreak(Qt::TopToolBarArea);
@@ -12010,14 +12020,6 @@ void MainWidget::show_preferences_dialog() {
     QDialog dialog(this);
     dialog.setWindowTitle("PaperNote 设置");
     dialog.setMinimumSize(520, 620);
-    dialog.setStyleSheet(
-        "QDialog { background: #1c1b22; }"
-        "QLabel { color: #ececf2; }"
-        "QCheckBox { color: #e8e8ee; font-size: 13px; padding: 3px 0; }"
-        "QPushButton { background: #35323f; color: #e8e8ee; border: 1px solid #4a4757;"
-        " border-radius: 7px; padding: 8px 18px; font-size: 13px; }"
-        "QPushButton:hover { background: #423e50; }"
-    );
 
     QVBoxLayout* layout = new QVBoxLayout(&dialog);
     layout->setContentsMargins(24, 20, 24, 18);
@@ -12033,7 +12035,7 @@ void MainWidget::show_preferences_dialog() {
 
     auto add_section = [&](const QString& text) {
         QLabel* label = new QLabel(text, &dialog);
-        label->setStyleSheet("color: #b9a8ff; font-size: 13px; font-weight: 600; margin-top: 10px;");
+        label->setStyleSheet("color: #c9b8ff; font-size: 12.5px; font-weight: 700; margin-top: 14px;");
         layout->addWidget(label);
     };
 
@@ -12086,66 +12088,73 @@ void MainWidget::create_main_toolbar() {
     main_toolbar->setObjectName("papernote_toolbar");
     main_toolbar->setMovable(false);
     main_toolbar->setFloatable(false);
-    main_toolbar->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    main_toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    main_toolbar->setIconSize(QSize(19, 19));
     main_toolbar->setStyleSheet(
-        "QToolBar { background: #23222a; border: none; padding: 4px 8px; spacing: 4px; }"
-        "QToolButton { color: #e8e8ee; background: transparent; border: 1px solid transparent;"
-        " border-radius: 6px; padding: 5px 10px; font-size: 13px; }"
-        "QToolButton:hover { background: #34323d; border-color: #4a4757; }"
-        "QToolButton:pressed { background: #2a2833; }"
-        "QToolButton:checked { background: #5b4a83; border-color: #8a72c0; }"
-        "QLineEdit { background: #17161c; color: #e8e8ee; border: 1px solid #3a3846;"
-        " border-radius: 6px; padding: 4px 6px; font-size: 13px; }"
+        "QToolBar#papernote_toolbar { background: #1e1d26; border: none;"
+        " padding: 5px 8px; spacing: 2px; }"
+        "QToolBar#papernote_toolbar QToolButton { color: #e9e8f1; background: transparent;"
+        " border: 1px solid transparent; border-radius: 7px; padding: 5px 10px; font-size: 12.5px; }"
+        "QToolBar#papernote_toolbar QToolButton:disabled { color: #5f5c70; }"
+        "QToolBar#papernote_toolbar QToolButton:hover { background: #2c2a36; border-color: #3f3c4e; }"
+        "QToolBar#papernote_toolbar QToolButton:pressed { background: #24222c; }"
+        "QToolBar#papernote_toolbar QToolButton:checked {"
+        " background: rgba(139, 108, 255, 0.30); border-color: #8b6cff; color: #ffffff; }"
+        "QToolBar#papernote_toolbar::separator { width: 1px; background: #34323f; margin: 6px 9px; }"
+        "QLineEdit { background: #17161d; color: #ecebf4; border: 1px solid #3a3847;"
+        " border-radius: 7px; padding: 4px 6px; font-size: 12.5px; }"
     );
 
-    auto add_button = [this](const QString& text, const QString& tooltip, std::function<void()> fn) {
-        QAction* action = main_toolbar->addAction(text);
+    auto add_button = [this](const QString& icon_name, const QString& text, const QString& tooltip,
+                             std::function<void()> fn) {
+        QAction* action = main_toolbar->addAction(papernote::icon(icon_name), " " + text);
         action->setToolTip(tooltip);
         connect(action, &QAction::triggered, this, [fn](bool) { fn(); });
         return action;
     };
 
-    add_button("打开 PDF", "打开一个 PDF 文件（也可以把文件直接拖进窗口）", [this]() {
+    add_button("open", "打开 PDF", "打开一个 PDF 文件（也可以把文件直接拖进窗口）", [this]() {
         run_ui_command("open_document");
     });
 
-    add_button("最近打开", "从最近阅读的文档里继续", [this]() {
+    add_button("recent", "最近", "从最近阅读的文档里继续", [this]() {
         show_home_dialog();
     });
 
     main_toolbar->addSeparator();
 
-    add_button("◀ 上一页", "上一页（也可以按 PageUp 或 Shift+空格）", [this]() {
+    add_button("prev", "上一页", "上一页（也可以按 PageUp 或 Shift+空格）", [this]() {
         run_ui_command("previous_page");
     });
 
     page_number_edit = new QLineEdit(main_toolbar);
-    page_number_edit->setFixedWidth(88);
+    page_number_edit->setFixedWidth(92);
+    page_number_edit->setFixedHeight(30);
     page_number_edit->setAlignment(Qt::AlignCenter);
     page_number_edit->setToolTip("输入页码后回车即可跳转");
     page_number_edit->setClearButtonEnabled(false);
     main_toolbar->addWidget(page_number_edit);
     connect(page_number_edit, &QLineEdit::returnPressed, this, &MainWidget::goto_page_from_edit);
 
-    add_button("下一页 ▶", "下一页（也可以按 PageDown 或空格）", [this]() {
+    add_button("next", "下一页", "下一页（也可以按 PageDown 或空格）", [this]() {
         run_ui_command("next_page");
     });
 
     main_toolbar->addSeparator();
 
-    add_button("－", "缩小", [this]() {
+    add_button("zoom_out", "缩小", "缩小", [this]() {
         run_ui_command("zoom_out");
     });
-    add_button("＋", "放大", [this]() {
+    add_button("zoom_in", "放大", "放大", [this]() {
         run_ui_command("zoom_in");
     });
-    add_button("适应宽度", "让页面宽度适应窗口", [this]() {
+    add_button("fit", "适应宽度", "让页面宽度适应窗口", [this]() {
         run_ui_command("fit_to_page_width");
     });
 
     main_toolbar->addSeparator();
 
-    QAction* highlight_action = add_button("高亮模式", "开启后，用鼠标选中文字就会自动加高亮；再点一次关闭", [this]() {
+    QAction* highlight_action = add_button("highlight", "高亮模式", "开启后，用鼠标选中文字就会自动加高亮；再点一次关闭", [this]() {
         is_select_highlight_mode = !is_select_highlight_mode;
         set_status_message(is_select_highlight_mode
             ? L"高亮模式：已开启，选中文字即可高亮（点工具栏按钮关闭）"
@@ -12154,21 +12163,21 @@ void MainWidget::create_main_toolbar() {
     highlight_action->setCheckable(true);
     select_highlight_action = highlight_action;
 
-    add_button("加书签", "给当前页添加书签", [this]() {
+    add_button("bookmark", "加书签", "给当前页添加书签", [this]() {
         run_ui_command("add_bookmark");
     });
 
-    add_button("导出笔记", "把所有高亮和书签导出为 Markdown 笔记", [this]() {
+    add_button("export", "导出笔记", "把所有高亮和书签导出为 Markdown 笔记", [this]() {
         run_ui_command("export_highlights");
     });
 
     main_toolbar->addSeparator();
 
-    add_button("搜索", "搜索文档内容", [this]() {
+    add_button("search", "搜索", "搜索文档内容", [this]() {
         run_ui_command("search");
     });
 
-    add_button("帮助", "查看快速上手说明", [this]() {
+    add_button("help", "帮助", "查看快速上手说明", [this]() {
         show_quickstart_dialog();
     });
 

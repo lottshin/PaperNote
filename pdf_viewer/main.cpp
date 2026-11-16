@@ -66,6 +66,7 @@
 #include "pdf_view_opengl_widget.h"
 #include "config.h"
 #include "main_widget.h"
+#include "papernote_theme.h"
 #include "path.h"
 #include "RunGuard.h"
 #include "checksum.h"
@@ -723,6 +724,7 @@ int main(int argc, char* args[]) {
 
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
     OpenWithApplication app(argc, args);
+    papernote::apply_app_theme(app);
 
     int font_id = QFontDatabase::addApplicationFont(":/resources/fonts/JetBrainsMono.ttf");
 
