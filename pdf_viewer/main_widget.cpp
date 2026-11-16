@@ -2123,7 +2123,12 @@ void MainWidget::open_document(const std::wstring& path, std::optional<float> of
     main_document_view->on_view_size_change(main_window_width, main_window_height);
     main_document_view->open_document(path, &this->is_render_invalidated);
     if (!doc()){
-        // failed to open document
+        // failed to open document: tell the user instead of failing silently
+        if (qEnvironmentVariableIsEmpty("PAPERNOTE_NO_UI")) {
+            QMessageBox::warning(this, "无法打开文件",
+                QString("这个文件无法打开：\n%1\n\n可能的原因：文件不存在、不是 PDF，或者文件已损坏。")
+                    .arg(QString::fromStdWString(path)));
+        }
         return;
     }
     adjust_two_page_mode_document_zoom_and_offset(doc()->get_path());
