@@ -669,6 +669,7 @@ public:
     std::wstring handle_add_highlight(char symbol);
     std::wstring handle_export_highlights();
     void show_quickstart_dialog();
+    void show_home_dialog(bool auto_show = false);
     void create_main_toolbar();
     void run_ui_command(const std::string& command);
     void goto_page_from_edit();

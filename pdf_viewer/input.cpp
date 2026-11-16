@@ -1150,6 +1150,7 @@ class SymbolCommand : public Command {
 public:
     char symbol = 0;
     SymbolCommand(std::string name, MainWidget* w) : Command(name, w) {}
+    char get_symbol() override { return symbol; }
     virtual std::optional<Requirement> next_requirement(MainWidget* widget) {
         if (symbol == 0) {
             return Requirement{ RequirementType::Symbol, "symbol" };
@@ -2683,6 +2684,19 @@ public:
     void perform() {
         result = widget->handle_export_highlights();
     }
+};
+
+class HomeCommand : public Command {
+public:
+    static inline const std::string cname = "home";
+    static inline const std::string hname = "Show recent documents";
+    HomeCommand(MainWidget* w) : Command(cname, w) {};
+
+    void perform() {
+        widget->show_home_dialog();
+    }
+
+    bool requires_document() { return false; }
 };
 
 class QuickstartCommand : public Command {
@@ -7316,6 +7330,7 @@ CommandManager::CommandManager(ConfigManager* config_manager) {
     register_command<AddHighlightCommand>();
     register_command<ExportHighlightsCommand>();
     register_command<QuickstartCommand>();
+    register_command<HomeCommand>();
     register_command<GotoTableOfContentsCommand>();
     register_command<GotoHighlightCommand>();
     register_command<IncreaseFreetextBookmarkFontSizeCommand>();

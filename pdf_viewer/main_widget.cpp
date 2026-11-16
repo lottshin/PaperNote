@@ -61,6 +61,9 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QToolBar>
+#include <QDialog>
+#include <QListWidget>
+#include <QVBoxLayout>
 #include <QAction>
 #include <QSignalBlocker>
 #include <QDesktopServices>
@@ -6302,6 +6305,123 @@ std::wstring MainWidget::handle_export_highlights() {
     return export_path.toStdWString();
 }
 
+void MainWidget::show_home_dialog(bool auto_show) {
+    std::vector<std::pair<std::wstring, std::wstring>> recent_books;
+    if (db_manager) {
+        db_manager->select_opened_books_path_and_doc_names(recent_books);
+    }
+
+    struct RecentEntry {
+        QString path;
+        QString title;
+    };
+
+    std::vector<RecentEntry> entries;
+    for (const auto& [hash_w, name_w] : recent_books) {
+        // opened_books stores the document checksum, not the filesystem path.
+        std::vector<std::wstring> paths;
+        if (db_manager) {
+            db_manager->get_path_from_hash(utf8_encode(hash_w), paths);
+        }
+        if (paths.empty()) {
+            continue;
+        }
+
+        QString path = QString::fromStdWString(paths.back());
+        if (!QFileInfo::exists(path)) {
+            continue;
+        }
+
+        QString name = QString::fromStdWString(name_w).trimmed();
+        if (name.isEmpty()) {
+            name = QFileInfo(path).fileName();
+        }
+
+        entries.push_back({path, name});
+        if (entries.size() >= 12) {
+            break;
+        }
+    }
+
+    // Auto-show only makes sense once the user actually has something to resume.
+    if (auto_show && entries.empty()) {
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("PaperNote");
+    dialog.setMinimumSize(640, 480);
+    dialog.setStyleSheet(
+        "QDialog { background: #1c1b22; }"
+        "QLabel { color: #ececf2; }"
+        "QListWidget { background: #26252e; border: 1px solid #383643; border-radius: 8px;"
+        " color: #e8e8ee; font-size: 13px; }"
+        "QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #302e3a; }"
+        "QListWidget::item:selected { background: #574a7d; }"
+        "QPushButton { background: #35323f; color: #e8e8ee; border: 1px solid #4a4757;"
+        " border-radius: 7px; padding: 8px 18px; font-size: 13px; }"
+        "QPushButton:hover { background: #423e50; }"
+    );
+
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(24, 22, 24, 20);
+    layout->setSpacing(10);
+
+    QLabel* title = new QLabel("PaperNote", &dialog);
+    title->setStyleSheet("font-size: 28px; font-weight: 600; color: #ffffff;");
+    QLabel* subtitle = new QLabel("继续阅读最近的文档，或打开新的 PDF", &dialog);
+    subtitle->setStyleSheet("color: #a9a6ba; font-size: 13px;");
+    layout->addWidget(title);
+    layout->addWidget(subtitle);
+
+    QListWidget* list = new QListWidget(&dialog);
+    for (const RecentEntry& entry : entries) {
+        QListWidgetItem* item = new QListWidgetItem(entry.title + "\n" + entry.path, list);
+        item->setData(Qt::UserRole, entry.path);
+        item->setToolTip(entry.path);
+    }
+    if (entries.empty()) {
+        QListWidgetItem* item = new QListWidgetItem("还没有最近打开的文档，点击下方「打开 PDF…」开始", list);
+        item->setFlags(Qt::NoItemFlags);
+    }
+    if (list->count() > 0) {
+        list->setCurrentRow(0);
+    }
+    layout->addWidget(list, 1);
+
+    QHBoxLayout* buttons = new QHBoxLayout();
+    QPushButton* open_button = new QPushButton("打开 PDF…", &dialog);
+    QPushButton* help_button = new QPushButton("快速上手", &dialog);
+    QPushButton* close_button = new QPushButton("关闭", &dialog);
+    buttons->addWidget(open_button);
+    buttons->addStretch();
+    buttons->addWidget(help_button);
+    buttons->addWidget(close_button);
+    layout->addLayout(buttons);
+
+    QString chosen_path;
+    QObject::connect(open_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(2); });
+    QObject::connect(help_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(3); });
+    QObject::connect(close_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(0); });
+    QObject::connect(list, &QListWidget::itemActivated, &dialog, [&](QListWidgetItem* item) {
+        chosen_path = item->data(Qt::UserRole).toString();
+        dialog.done(1);
+    });
+
+    int result = dialog.exec();
+
+    if (result == 1 && !chosen_path.isEmpty()) {
+        push_state();
+        open_document(chosen_path.toStdWString());
+    }
+    else if (result == 1 || result == 2) {
+        run_ui_command("open_document");
+    }
+    else if (result == 3) {
+        show_quickstart_dialog();
+    }
+}
+
 void MainWidget::show_quickstart_dialog() {
     QMessageBox message_box(this);
     message_box.setWindowTitle("PaperNote 快速上手");
@@ -7726,7 +7846,13 @@ QMenu* MainWidget::get_menu_from_items(std::unique_ptr<MenuItems> items, QWidget
             std::unique_ptr<Command> subcommand = std::get<std::unique_ptr<Command>>(std::move(subitem));
             std::string command_name = subcommand->get_human_readable_name();
 
-            QAction* action = new QAction(QString::fromStdString(command_name), contextMenu);
+            QString action_label = papernote_tr_command(subcommand->get_name(), QString::fromStdString(command_name));
+            char symbol = subcommand->get_symbol();
+            if (symbol != 0 && subcommand->get_name() == "add_highlight") {
+                action_label += QString("（%1）").arg(QChar(symbol));
+            }
+
+            QAction* action = new QAction(action_label, contextMenu);
             actions.push_back(action);
             connect(action, &QAction::triggered, [&, command_name, subcommand = std::move(subcommand)]() mutable {
                 //execute_macro_if_enabled(command_name.toStdWString());
@@ -11797,6 +11923,10 @@ void MainWidget::create_main_toolbar() {
         run_ui_command("open_document");
     });
 
+    add_button("最近打开", "从最近阅读的文档里继续", [this]() {
+        show_home_dialog();
+    });
+
     main_toolbar->addSeparator();
 
     add_button("◀ 上一页", "上一页（也可以按 PageUp 或 Shift+空格）", [this]() {
@@ -11865,6 +11995,7 @@ QMenuBar* MainWidget::create_main_menu_bar(){
         "File",
         "",
         {
+            new MenuNode{ "home", "", {}},
             new MenuNode{ "open_document", "", {}},
             new MenuNode { "open_prev_doc", "", {}},
             new MenuNode { "open_document_embedded", "", {}},

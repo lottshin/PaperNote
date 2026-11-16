@@ -42,6 +42,12 @@ inline QString papernote_tr_menu(const QString& english) {
 inline QString papernote_tr_command(const std::string& command, const QString& fallback) {
     static const std::unordered_map<std::string, QString> map = {
         // File / 文件
+        {"home", "最近打开…"},
+        {"copy", "复制"},
+        {"export_highlights", "导出笔记"},
+        {"help", "快速上手"},
+        {"edit_selected_annotation", "编辑批注…"},
+        {"move_selected_bookmark", "移动书签"},
         {"open_document", "打开文档…"},
         {"open_prev_doc", "打开上一个文档"},
         {"open_document_embedded", "打开嵌入的文档…"},

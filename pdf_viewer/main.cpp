@@ -435,6 +435,10 @@ void invalidate_render() {
     }
 }
 
+// Set when the app was launched without a file argument, so PaperNote can show
+// its recent-documents home screen once the window is up.
+static bool papernote_show_home_after_startup = false;
+
 MainWidget* handle_args(const QStringList& arguments, QLocalSocket* origin=nullptr) {
     std::optional<int> page = -1;
     std::optional<float> x_loc, y_loc;
@@ -492,6 +496,8 @@ MainWidget* handle_args(const QStringList& arguments, QLocalSocket* origin=nullp
                     pdf_file_name = tutorial_path.get_path();
                 }
             }
+
+            papernote_show_home_after_startup = true;
         }
     }
 
@@ -945,6 +951,13 @@ int main(int argc, char* args[]) {
     QCoreApplication::processEvents();
 
     handle_args(app.arguments());
+
+    if (papernote_show_home_after_startup && !has_arg(argc, args, "--execute-command")) {
+        QTimer::singleShot(500, main_widget, [main_widget]() {
+            main_widget->show_home_dialog(true);
+        });
+    }
+
     main_widget->execute_macro_if_enabled(STARTUP_COMMANDS);
 
     //main_widget->run_multiple_commands(STARTUP_COMMANDS);
