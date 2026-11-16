@@ -3,6 +3,7 @@
 #include <deque>
 #include <iostream>
 #include <vector>
+#include <qtimer.h>
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -2686,6 +2687,21 @@ public:
     }
 };
 
+class PreferencesDialogCommand : public Command {
+public:
+    static inline const std::string cname = "preferences_dialog";
+    static inline const std::string hname = "Open PaperNote settings";
+    PreferencesDialogCommand(MainWidget* w) : Command(cname, w) {};
+
+    void perform() {
+        // Defer: --execute-command runs inside a QLocalSocket callback, and a
+        // modal dialog with a nested event loop there can crash on return.
+        QTimer::singleShot(0, widget, [w = widget]() { w->show_preferences_dialog(); });
+    }
+
+    bool requires_document() { return false; }
+};
+
 class HomeCommand : public Command {
 public:
     static inline const std::string cname = "home";
@@ -2693,7 +2709,7 @@ public:
     HomeCommand(MainWidget* w) : Command(cname, w) {};
 
     void perform() {
-        widget->show_home_dialog();
+        QTimer::singleShot(0, widget, [w = widget]() { w->show_home_dialog(); });
     }
 
     bool requires_document() { return false; }
@@ -2706,7 +2722,7 @@ public:
     QuickstartCommand(MainWidget* w) : Command(cname, w) {};
 
     void perform() {
-        widget->show_quickstart_dialog();
+        QTimer::singleShot(0, widget, [w = widget]() { w->show_quickstart_dialog(); });
     }
 
     bool requires_document() { return false; }
@@ -7331,6 +7347,7 @@ CommandManager::CommandManager(ConfigManager* config_manager) {
     register_command<ExportHighlightsCommand>();
     register_command<QuickstartCommand>();
     register_command<HomeCommand>();
+    register_command<PreferencesDialogCommand>();
     register_command<GotoTableOfContentsCommand>();
     register_command<GotoHighlightCommand>();
     register_command<IncreaseFreetextBookmarkFontSizeCommand>();

@@ -28,6 +28,7 @@ class QLocalSocket;
 class QLineEdit;
 class QToolBar;
 class QAction;
+class QTabBar;
 class QTextEdit;
 class QTimer;
 class QDragEvent;
@@ -367,6 +368,10 @@ public:
     QToolBar* main_toolbar = nullptr;
     QLineEdit* page_number_edit = nullptr;
     QAction* select_highlight_action = nullptr;
+
+    // PaperNote document tabs
+    QToolBar* document_tabs_bar = nullptr;
+    QTabBar* document_tabs = nullptr;
     int text_suggestion_index = 0;
 
     int last_pause_rest_of_document_page = -1;
@@ -671,6 +676,9 @@ public:
     void show_quickstart_dialog();
     void show_home_dialog(bool auto_show = false);
     void create_main_toolbar();
+    void create_document_tabbar();
+    void refresh_document_tabbar();
+    void show_preferences_dialog();
     void run_ui_command(const std::string& command);
     void goto_page_from_edit();
     void handle_goto_highlight();

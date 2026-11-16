@@ -1,7 +1,15 @@
 diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 --- a/pdf_viewer/input.cpp
 +++ b/pdf_viewer/input.cpp
-@@ -1150,6 +1150,7 @@
+@@ -3,6 +3,7 @@
+ #include <deque>
+ #include <iostream>
+ #include <vector>
++#include <qtimer.h>
+ #include <string>
+ #include <fstream>
+ #include <sstream>
+@@ -1150,6 +1151,7 @@
  public:
      char symbol = 0;
      SymbolCommand(std::string name, MainWidget* w) : Command(name, w) {}
@@ -9,7 +17,7 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
      virtual std::optional<Requirement> next_requirement(MainWidget* widget) {
          if (symbol == 0) {
              return Requirement{ RequirementType::Symbol, "symbol" };
-@@ -2671,9 +2672,46 @@
+@@ -2671,7 +2673,59 @@
      std::vector<char> special_symbols() {
          std::vector<char> res = { '_', };
          return res;
@@ -24,9 +32,24 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +
 +    void perform() {
 +        result = widget->handle_export_highlights();
-     }
- };
- 
++    }
++};
++
++class PreferencesDialogCommand : public Command {
++public:
++    static inline const std::string cname = "preferences_dialog";
++    static inline const std::string hname = "Open PaperNote settings";
++    PreferencesDialogCommand(MainWidget* w) : Command(cname, w) {};
++
++    void perform() {
++        // Defer: --execute-command runs inside a QLocalSocket callback, and a
++        // modal dialog with a nested event loop there can crash on return.
++        QTimer::singleShot(0, widget, [w = widget]() { w->show_preferences_dialog(); });
++    }
++
++    bool requires_document() { return false; }
++};
++
 +class HomeCommand : public Command {
 +public:
 +    static inline const std::string cname = "home";
@@ -34,7 +57,7 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +    HomeCommand(MainWidget* w) : Command(cname, w) {};
 +
 +    void perform() {
-+        widget->show_home_dialog();
++        QTimer::singleShot(0, widget, [w = widget]() { w->show_home_dialog(); });
 +    }
 +
 +    bool requires_document() { return false; }
@@ -47,22 +70,21 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +    QuickstartCommand(MainWidget* w) : Command(cname, w) {};
 +
 +    void perform() {
-+        widget->show_quickstart_dialog();
-+    }
++        QTimer::singleShot(0, widget, [w = widget]() { w->show_quickstart_dialog(); });
+     }
 +
 +    bool requires_document() { return false; }
-+};
-+
+ };
+ 
  class CommandPaletteCommand : public Command {
- public:
-     static inline const std::string cname = "command_palette";
-@@ -7290,6 +7328,9 @@
+@@ -7290,6 +7344,10 @@
      register_command<CopyScreenshotToScratchpad>();
      register_command<CopyScreenshotToClipboard>();
      register_command<AddHighlightCommand>();
 +    register_command<ExportHighlightsCommand>();
 +    register_command<QuickstartCommand>();
 +    register_command<HomeCommand>();
++    register_command<PreferencesDialogCommand>();
      register_command<GotoTableOfContentsCommand>();
      register_command<GotoHighlightCommand>();
      register_command<IncreaseFreetextBookmarkFontSizeCommand>();
@@ -126,7 +148,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <iostream>
  #include <vector>
  #include <string>
-@@ -56,6 +58,17 @@
+@@ -56,6 +58,19 @@
  #include <qguiapplication.h>
  #include <qmimedata.h>
  #include <qscreen.h>
@@ -135,6 +157,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +#include <QToolBar>
 +#include <QDialog>
 +#include <QListWidget>
++#include <QTabBar>
++#include <QCheckBox>
 +#include <QVBoxLayout>
 +#include <QAction>
 +#include <QSignalBlocker>
@@ -144,16 +168,17 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <QGestureEvent>
  #include <qjsonarray.h>
  #include <qjsonobject.h>
-@@ -1369,6 +1382,8 @@
+@@ -1369,6 +1384,9 @@
      }
      menu_bar = create_main_menu_bar();
      setMenuBar(menu_bar);
 +    create_main_toolbar();
++    create_document_tabbar();
 +
      menu_bar->stackUnder(text_command_line_edit_container);
  #endif
  
-@@ -1883,6 +1898,24 @@
+@@ -1883,6 +1901,26 @@
  void MainWidget::validate_ui() {
      status_label_left->setText(QString::fromStdWString(get_status_string(false)));
      status_label_right->setText(QString::fromStdWString(get_status_string(true)));
@@ -175,10 +200,12 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        }
 +    }
 +
++    refresh_document_tabbar();
++
      update_command_hints_position();
      is_ui_invalidated = false;
  }
-@@ -2089,8 +2122,20 @@
+@@ -2089,8 +2127,20 @@
  
      main_document_view->on_view_size_change(main_window_width, main_window_height);
      main_document_view->open_document(path, &this->is_render_invalidated);
@@ -201,7 +228,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          return;
      }
      adjust_two_page_mode_document_zoom_and_offset(doc()->get_path());
-@@ -2111,7 +2156,7 @@
+@@ -2111,7 +2161,7 @@
      if (has_document) {
          //setWindowTitle(QString::fromStdWString(path.get_path()));
          if (file_name.size() > 0) {
@@ -210,7 +237,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          }
          else {
              setWindowTitle(QString::fromStdWString(path));
-@@ -6145,6 +6190,265 @@
+@@ -6145,9 +6195,268 @@
      else {
          change_selected_highlight_type(symbol);
          return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
@@ -336,11 +363,11 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        else if (message_box.clickedButton() == open_folder_button) {
 +            QDesktopServices::openUrl(QUrl::fromLocalFile(document_info.dir().absolutePath()));
 +        }
-+    }
+     }
 +
 +    return export_path.toStdWString();
-+}
-+
+ }
+ 
 +void MainWidget::show_home_dialog(bool auto_show) {
 +    std::vector<std::pair<std::wstring, std::wstring>> recent_books;
 +    if (db_manager) {
@@ -473,10 +500,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +
 +    if (open_document_button && message_box.clickedButton() == open_document_button) {
 +        run_ui_command("open_document");
-     }
- }
- 
-@@ -7554,7 +7858,13 @@
++    }
++}
++
+ void MainWidget::change_selected_highlight_type(char new_type) {
+     if (selected_highlight_index != -1) {
+         doc()->update_highlight_type(selected_highlight_index, new_type);
+@@ -7554,7 +7863,13 @@
              std::unique_ptr<Command> subcommand = std::get<std::unique_ptr<Command>>(std::move(subitem));
              std::string command_name = subcommand->get_human_readable_name();
  
@@ -491,7 +521,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              actions.push_back(action);
              connect(action, &QAction::triggered, [&, command_name, subcommand = std::move(subcommand)]() mutable {
                  //execute_macro_if_enabled(command_name.toStdWString());
-@@ -11547,7 +11857,7 @@
+@@ -11547,7 +11862,7 @@
              key_mappings = command_key_mappings[command];
          }
  
@@ -500,7 +530,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  
          if (key_mappings.size() > 0){
              action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
-@@ -11567,11 +11877,128 @@
+@@ -11567,19 +11882,306 @@
  
      }
      else {
@@ -509,14 +539,14 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          for (auto&& child : items->children) {
              create_menu_from_menu_node(menu, child, command_key_mappings);
          }
-+    }
-+}
-+
+     }
+ }
+ 
 +void MainWidget::run_ui_command(const std::string& command) {
 +    auto cmd = command_manager->get_command_with_name(this, command);
 +    if (cmd) {
 +        handle_command_types(std::move(cmd), 0);
-     }
++    }
 +}
 +
 +void MainWidget::goto_page_from_edit() {
@@ -533,6 +563,175 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    }
 +
 +    page_number_edit->clearFocus();
++}
++
++void MainWidget::create_document_tabbar() {
++    document_tabs_bar = new QToolBar("标签页", this);
++    document_tabs_bar->setObjectName("papernote_tabs_bar");
++    document_tabs_bar->setMovable(false);
++    document_tabs_bar->setFloatable(false);
++    document_tabs_bar->setStyleSheet(
++        "QToolBar { background: #1d1c23; border: none; padding: 0px 8px 4px 8px; }"
++    );
++
++    document_tabs = new QTabBar(document_tabs_bar);
++    document_tabs->setExpanding(false);
++    document_tabs->setMovable(false);
++    document_tabs->setTabsClosable(true);
++    document_tabs->setElideMode(Qt::ElideRight);
++    document_tabs->setStyleSheet(
++        "QTabBar::tab { background: #2a2933; color: #cfcddb; padding: 6px 14px; margin-right: 2px;"
++        " border-top-left-radius: 6px; border-top-right-radius: 6px; max-width: 220px; }"
++        "QTabBar::tab:selected { background: #4b3f6b; color: #ffffff; }"
++        "QTabBar::tab:hover { background: #35323f; }"
++    );
++    document_tabs_bar->addWidget(document_tabs);
++    addToolBarBreak(Qt::TopToolBarArea);
++    addToolBar(Qt::TopToolBarArea, document_tabs_bar);
++    document_tabs_bar->setVisible(false);
++
++    QObject::connect(document_tabs, &QTabBar::currentChanged, this, [this](int index) {
++        if (index < 0 || index >= document_tabs->count()) {
++            return;
++        }
++        QString path = document_tabs->tabData(index).toString();
++        if (path.isEmpty()) {
++            return;
++        }
++        if (doc() && QString::fromStdWString(doc()->get_path()) == path) {
++            return;
++        }
++        handle_goto_tab(path.toStdWString());
++    });
++
++    QObject::connect(document_tabs, &QTabBar::tabCloseRequested, this, [this](int index) {
++        if (index < 0 || index >= document_tabs->count()) {
++            return;
++        }
++        std::wstring path = document_tabs->tabData(index).toString().toStdWString();
++        bool was_current = (index == document_tabs->currentIndex());
++        document_manager->remove_tab(path);
++
++        std::vector<std::wstring> remaining = document_manager->get_tabs();
++        if (was_current && !remaining.empty()) {
++            handle_goto_tab(remaining[0]);
++        }
++        refresh_document_tabbar();
++    });
++}
++
++void MainWidget::refresh_document_tabbar() {
++    if (!document_tabs || !document_tabs_bar) {
++        return;
++    }
++
++    std::vector<std::wstring> tabs = document_manager->get_tabs();
++    int current = get_current_tab_index();
++
++    bool same = (document_tabs->count() == (int)tabs.size());
++    if (same) {
++        for (int i = 0; i < (int)tabs.size(); i++) {
++            if (document_tabs->tabData(i).toString().toStdWString() != tabs[i]) {
++                same = false;
++                break;
++            }
++        }
++    }
++
++    if (!same) {
++        QSignalBlocker blocker(document_tabs);
++        while (document_tabs->count() > 0) {
++            document_tabs->removeTab(0);
++        }
++        for (const std::wstring& path : tabs) {
++            std::optional<std::wstring> file_name = Path(path).filename();
++            int index = document_tabs->addTab(QString::fromStdWString(file_name.value_or(path)));
++            document_tabs->setTabData(index, QString::fromStdWString(path));
++            document_tabs->setTabToolTip(index, QString::fromStdWString(path));
++        }
++    }
++
++    if (current >= 0 && current < document_tabs->count()) {
++        QSignalBlocker blocker(document_tabs);
++        document_tabs->setCurrentIndex(current);
++    }
++
++    document_tabs_bar->setVisible(document_tabs->count() > 1);
++}
++
++void MainWidget::show_preferences_dialog() {
++    QDialog dialog(this);
++    dialog.setWindowTitle("PaperNote 设置");
++    dialog.setMinimumSize(520, 620);
++    dialog.setStyleSheet(
++        "QDialog { background: #1c1b22; }"
++        "QLabel { color: #ececf2; }"
++        "QCheckBox { color: #e8e8ee; font-size: 13px; padding: 3px 0; }"
++        "QPushButton { background: #35323f; color: #e8e8ee; border: 1px solid #4a4757;"
++        " border-radius: 7px; padding: 8px 18px; font-size: 13px; }"
++        "QPushButton:hover { background: #423e50; }"
++    );
++
++    QVBoxLayout* layout = new QVBoxLayout(&dialog);
++    layout->setContentsMargins(24, 20, 24, 18);
++    layout->setSpacing(5);
++
++    QLabel* title = new QLabel("设置", &dialog);
++    title->setStyleSheet("font-size: 24px; font-weight: 600; color: #ffffff;");
++    QLabel* subtitle = new QLabel("修改会立即保存，对下次启动同样生效", &dialog);
++    subtitle->setStyleSheet("color: #a9a6ba; font-size: 12px;");
++    layout->addWidget(title);
++    layout->addWidget(subtitle);
++    layout->addSpacing(8);
++
++    auto add_section = [&](const QString& text) {
++        QLabel* label = new QLabel(text, &dialog);
++        label->setStyleSheet("color: #b9a8ff; font-size: 13px; font-weight: 600; margin-top: 10px;");
++        layout->addWidget(label);
++    };
++
++    auto add_toggle = [&](const QString& text, const wchar_t* config_name) {
++        QCheckBox* checkbox = new QCheckBox(text, &dialog);
++        const bool* value = config_manager->get_config<bool>(std::wstring(config_name));
++        checkbox->setChecked(value && *value);
++        QObject::connect(checkbox, &QCheckBox::toggled, this, [this, config_name](bool checked) {
++            std::string name = utf8_encode(std::wstring(config_name));
++            if (config_manager->deserialize_config(name, checked ? L"true" : L"false")) {
++                on_config_changed(name, true);
++            }
++        });
++        layout->addWidget(checkbox);
++    };
++
++    add_section("阅读");
++    add_toggle("高亮按页面位置排序", L"sort_highlights_by_location");
++    add_toggle("书签按页面位置排序", L"sort_bookmarks_by_location");
++    add_toggle("在页面上显示 PDF 自带注释", L"render_pdf_annotations");
++    add_toggle("鼠标悬停显示预览", L"hover_overview");
++
++    add_section("操作");
++    add_toggle("滚轮缩放以光标为中心", L"wheel_zoom_on_cursor");
++    add_toggle("图像平滑（关闭后文字更锐利）", L"linear_filter");
++
++    add_section("界面");
++    add_toggle("状态栏显示文档名", L"show_document_name_in_statusbar");
++    add_toggle("深色模式（重启后生效）", L"default_dark_mode");
++
++    add_section("启动");
++    add_toggle("启动时打开上次阅读的文档", L"open_last_file_on_startup");
++    add_toggle("没有文档时打开教程", L"should_load_tutorial_when_no_other_file");
++
++    layout->addStretch(1);
++
++    QHBoxLayout* buttons = new QHBoxLayout();
++    QPushButton* close_button = new QPushButton("关闭", &dialog);
++    buttons->addStretch();
++    buttons->addWidget(close_button);
++    layout->addLayout(buttons);
++
++    QObject::connect(close_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(0); });
++
++    dialog.exec();
 +}
 +
 +void MainWidget::create_main_toolbar() {
@@ -627,10 +826,11 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    });
 +
 +    addToolBar(Qt::TopToolBarArea, main_toolbar);
- }
- 
++}
++
  QMenuBar* MainWidget::create_main_menu_bar(){
-@@ -11580,6 +12007,7 @@
+ 
+     MenuNode* file_menu_node = new MenuNode{
          "File",
          "",
          {
@@ -638,7 +838,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              new MenuNode{ "open_document", "", {}},
              new MenuNode { "open_prev_doc", "", {}},
              new MenuNode { "open_document_embedded", "", {}},
-@@ -11809,21 +12237,39 @@
+@@ -11809,21 +12411,39 @@
      auto command_key_mappings = input_handler->get_command_key_mappings();
      QMenuBar* menu_bar = new QMenuBar(this);
      for (auto top_level_menu : top_level_menus) {
@@ -687,16 +887,17 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 --- a/pdf_viewer/main_widget.h
 +++ b/pdf_viewer/main_widget.h
-@@ -26,6 +26,8 @@
+@@ -26,6 +26,9 @@
  class SelectionIndicator;
  class QLocalSocket;
  class QLineEdit;
 +class QToolBar;
 +class QAction;
++class QTabBar;
  class QTextEdit;
  class QTimer;
  class QDragEvent;
-@@ -360,6 +362,11 @@
+@@ -360,6 +363,15 @@
      QLabel* status_label_left = nullptr;
      QLabel* status_label_right = nullptr;
      QWidget* status_label = nullptr;
@@ -705,10 +906,14 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    QToolBar* main_toolbar = nullptr;
 +    QLineEdit* page_number_edit = nullptr;
 +    QAction* select_highlight_action = nullptr;
++
++    // PaperNote document tabs
++    QToolBar* document_tabs_bar = nullptr;
++    QTabBar* document_tabs = nullptr;
      int text_suggestion_index = 0;
  
      int last_pause_rest_of_document_page = -1;
-@@ -660,6 +667,12 @@
+@@ -660,6 +672,15 @@
      void handle_show_marks();
      void handle_goto_bookmark_global();
      std::wstring handle_add_highlight(char symbol);
@@ -716,6 +921,9 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    void show_quickstart_dialog();
 +    void show_home_dialog(bool auto_show = false);
 +    void create_main_toolbar();
++    void create_document_tabbar();
++    void refresh_document_tabbar();
++    void show_preferences_dialog();
 +    void run_ui_command(const std::string& command);
 +    void goto_page_from_edit();
      void handle_goto_highlight();
@@ -793,7 +1001,7 @@ diff --git a/pdf_viewer/ui_translation.h b/pdf_viewer/ui_translation.h
 new file mode 100644
 --- /dev/null
 +++ b/pdf_viewer/ui_translation.h
-@@ -0,0 +1,202 @@
+@@ -0,0 +1,203 @@
 +#pragma once
 +
 +// Chinese (zh-CN) UI strings for the PaperNote fork.
@@ -839,6 +1047,7 @@ new file mode 100644
 +    static const std::unordered_map<std::string, QString> map = {
 +        // File / 文件
 +        {"home", "最近打开…"},
++        {"preferences_dialog", "图形化设置…"},
 +        {"copy", "复制"},
 +        {"export_highlights", "导出笔记"},
 +        {"help", "快速上手"},

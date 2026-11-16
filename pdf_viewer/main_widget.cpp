@@ -63,6 +63,8 @@
 #include <QToolBar>
 #include <QDialog>
 #include <QListWidget>
+#include <QTabBar>
+#include <QCheckBox>
 #include <QVBoxLayout>
 #include <QAction>
 #include <QSignalBlocker>
@@ -1383,6 +1385,7 @@ MainWidget::MainWidget(fz_context* mupdf_context,
     menu_bar = create_main_menu_bar();
     setMenuBar(menu_bar);
     create_main_toolbar();
+    create_document_tabbar();
 
     menu_bar->stackUnder(text_command_line_edit_container);
 #endif
@@ -1915,6 +1918,8 @@ void MainWidget::validate_ui() {
             page_number_edit->setText(QString());
         }
     }
+
+    refresh_document_tabbar();
 
     update_command_hints_position();
     is_ui_invalidated = false;
@@ -11905,6 +11910,175 @@ void MainWidget::goto_page_from_edit() {
     }
 
     page_number_edit->clearFocus();
+}
+
+void MainWidget::create_document_tabbar() {
+    document_tabs_bar = new QToolBar("标签页", this);
+    document_tabs_bar->setObjectName("papernote_tabs_bar");
+    document_tabs_bar->setMovable(false);
+    document_tabs_bar->setFloatable(false);
+    document_tabs_bar->setStyleSheet(
+        "QToolBar { background: #1d1c23; border: none; padding: 0px 8px 4px 8px; }"
+    );
+
+    document_tabs = new QTabBar(document_tabs_bar);
+    document_tabs->setExpanding(false);
+    document_tabs->setMovable(false);
+    document_tabs->setTabsClosable(true);
+    document_tabs->setElideMode(Qt::ElideRight);
+    document_tabs->setStyleSheet(
+        "QTabBar::tab { background: #2a2933; color: #cfcddb; padding: 6px 14px; margin-right: 2px;"
+        " border-top-left-radius: 6px; border-top-right-radius: 6px; max-width: 220px; }"
+        "QTabBar::tab:selected { background: #4b3f6b; color: #ffffff; }"
+        "QTabBar::tab:hover { background: #35323f; }"
+    );
+    document_tabs_bar->addWidget(document_tabs);
+    addToolBarBreak(Qt::TopToolBarArea);
+    addToolBar(Qt::TopToolBarArea, document_tabs_bar);
+    document_tabs_bar->setVisible(false);
+
+    QObject::connect(document_tabs, &QTabBar::currentChanged, this, [this](int index) {
+        if (index < 0 || index >= document_tabs->count()) {
+            return;
+        }
+        QString path = document_tabs->tabData(index).toString();
+        if (path.isEmpty()) {
+            return;
+        }
+        if (doc() && QString::fromStdWString(doc()->get_path()) == path) {
+            return;
+        }
+        handle_goto_tab(path.toStdWString());
+    });
+
+    QObject::connect(document_tabs, &QTabBar::tabCloseRequested, this, [this](int index) {
+        if (index < 0 || index >= document_tabs->count()) {
+            return;
+        }
+        std::wstring path = document_tabs->tabData(index).toString().toStdWString();
+        bool was_current = (index == document_tabs->currentIndex());
+        document_manager->remove_tab(path);
+
+        std::vector<std::wstring> remaining = document_manager->get_tabs();
+        if (was_current && !remaining.empty()) {
+            handle_goto_tab(remaining[0]);
+        }
+        refresh_document_tabbar();
+    });
+}
+
+void MainWidget::refresh_document_tabbar() {
+    if (!document_tabs || !document_tabs_bar) {
+        return;
+    }
+
+    std::vector<std::wstring> tabs = document_manager->get_tabs();
+    int current = get_current_tab_index();
+
+    bool same = (document_tabs->count() == (int)tabs.size());
+    if (same) {
+        for (int i = 0; i < (int)tabs.size(); i++) {
+            if (document_tabs->tabData(i).toString().toStdWString() != tabs[i]) {
+                same = false;
+                break;
+            }
+        }
+    }
+
+    if (!same) {
+        QSignalBlocker blocker(document_tabs);
+        while (document_tabs->count() > 0) {
+            document_tabs->removeTab(0);
+        }
+        for (const std::wstring& path : tabs) {
+            std::optional<std::wstring> file_name = Path(path).filename();
+            int index = document_tabs->addTab(QString::fromStdWString(file_name.value_or(path)));
+            document_tabs->setTabData(index, QString::fromStdWString(path));
+            document_tabs->setTabToolTip(index, QString::fromStdWString(path));
+        }
+    }
+
+    if (current >= 0 && current < document_tabs->count()) {
+        QSignalBlocker blocker(document_tabs);
+        document_tabs->setCurrentIndex(current);
+    }
+
+    document_tabs_bar->setVisible(document_tabs->count() > 1);
+}
+
+void MainWidget::show_preferences_dialog() {
+    QDialog dialog(this);
+    dialog.setWindowTitle("PaperNote 设置");
+    dialog.setMinimumSize(520, 620);
+    dialog.setStyleSheet(
+        "QDialog { background: #1c1b22; }"
+        "QLabel { color: #ececf2; }"
+        "QCheckBox { color: #e8e8ee; font-size: 13px; padding: 3px 0; }"
+        "QPushButton { background: #35323f; color: #e8e8ee; border: 1px solid #4a4757;"
+        " border-radius: 7px; padding: 8px 18px; font-size: 13px; }"
+        "QPushButton:hover { background: #423e50; }"
+    );
+
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(24, 20, 24, 18);
+    layout->setSpacing(5);
+
+    QLabel* title = new QLabel("设置", &dialog);
+    title->setStyleSheet("font-size: 24px; font-weight: 600; color: #ffffff;");
+    QLabel* subtitle = new QLabel("修改会立即保存，对下次启动同样生效", &dialog);
+    subtitle->setStyleSheet("color: #a9a6ba; font-size: 12px;");
+    layout->addWidget(title);
+    layout->addWidget(subtitle);
+    layout->addSpacing(8);
+
+    auto add_section = [&](const QString& text) {
+        QLabel* label = new QLabel(text, &dialog);
+        label->setStyleSheet("color: #b9a8ff; font-size: 13px; font-weight: 600; margin-top: 10px;");
+        layout->addWidget(label);
+    };
+
+    auto add_toggle = [&](const QString& text, const wchar_t* config_name) {
+        QCheckBox* checkbox = new QCheckBox(text, &dialog);
+        const bool* value = config_manager->get_config<bool>(std::wstring(config_name));
+        checkbox->setChecked(value && *value);
+        QObject::connect(checkbox, &QCheckBox::toggled, this, [this, config_name](bool checked) {
+            std::string name = utf8_encode(std::wstring(config_name));
+            if (config_manager->deserialize_config(name, checked ? L"true" : L"false")) {
+                on_config_changed(name, true);
+            }
+        });
+        layout->addWidget(checkbox);
+    };
+
+    add_section("阅读");
+    add_toggle("高亮按页面位置排序", L"sort_highlights_by_location");
+    add_toggle("书签按页面位置排序", L"sort_bookmarks_by_location");
+    add_toggle("在页面上显示 PDF 自带注释", L"render_pdf_annotations");
+    add_toggle("鼠标悬停显示预览", L"hover_overview");
+
+    add_section("操作");
+    add_toggle("滚轮缩放以光标为中心", L"wheel_zoom_on_cursor");
+    add_toggle("图像平滑（关闭后文字更锐利）", L"linear_filter");
+
+    add_section("界面");
+    add_toggle("状态栏显示文档名", L"show_document_name_in_statusbar");
+    add_toggle("深色模式（重启后生效）", L"default_dark_mode");
+
+    add_section("启动");
+    add_toggle("启动时打开上次阅读的文档", L"open_last_file_on_startup");
+    add_toggle("没有文档时打开教程", L"should_load_tutorial_when_no_other_file");
+
+    layout->addStretch(1);
+
+    QHBoxLayout* buttons = new QHBoxLayout();
+    QPushButton* close_button = new QPushButton("关闭", &dialog);
+    buttons->addStretch();
+    buttons->addWidget(close_button);
+    layout->addLayout(buttons);
+
+    QObject::connect(close_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(0); });
+
+    dialog.exec();
 }
 
 void MainWidget::create_main_toolbar() {

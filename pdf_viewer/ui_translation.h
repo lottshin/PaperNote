@@ -43,6 +43,7 @@ inline QString papernote_tr_command(const std::string& command, const QString& f
     static const std::unordered_map<std::string, QString> map = {
         // File / 文件
         {"home", "最近打开…"},
+        {"preferences_dialog", "图形化设置…"},
         {"copy", "复制"},
         {"export_highlights", "导出笔记"},
         {"help", "快速上手"},
