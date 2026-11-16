@@ -1,4 +1,5 @@
-diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp--- a/pdf_viewer/input.cpp
+diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
+--- a/pdf_viewer/input.cpp
 +++ b/pdf_viewer/input.cpp
 @@ -1150,6 +1150,7 @@
  public:
@@ -65,7 +66,8 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp--- a/pdf_viewer/input.c
      register_command<GotoTableOfContentsCommand>();
      register_command<GotoHighlightCommand>();
      register_command<IncreaseFreetextBookmarkFontSizeCommand>();
-diff --git a/pdf_viewer/input.h b/pdf_viewer/input.h--- a/pdf_viewer/input.h
+diff --git a/pdf_viewer/input.h b/pdf_viewer/input.h
+--- a/pdf_viewer/input.h
 +++ b/pdf_viewer/input.h
 @@ -82,6 +82,7 @@
      virtual std::string get_name();
@@ -75,7 +77,8 @@ diff --git a/pdf_viewer/input.h b/pdf_viewer/input.h--- a/pdf_viewer/input.h
      virtual std::wstring get_text_default_value();
      virtual ~Command();
  };
-diff --git a/pdf_viewer/main.cpp b/pdf_viewer/main.cpp--- a/pdf_viewer/main.cpp
+diff --git a/pdf_viewer/main.cpp b/pdf_viewer/main.cpp
+--- a/pdf_viewer/main.cpp
 +++ b/pdf_viewer/main.cpp
 @@ -434,6 +434,10 @@
          window->invalidate_render();
@@ -111,7 +114,8 @@ diff --git a/pdf_viewer/main.cpp b/pdf_viewer/main.cpp--- a/pdf_viewer/main.cpp
      main_widget->execute_macro_if_enabled(STARTUP_COMMANDS);
  
      //main_widget->run_multiple_commands(STARTUP_COMMANDS);
-diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_viewer/main_widget.cpp
+diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
+--- a/pdf_viewer/main_widget.cpp
 +++ b/pdf_viewer/main_widget.cpp
 @@ -14,6 +14,8 @@
  
@@ -174,11 +178,20 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
      update_command_hints_position();
      is_ui_invalidated = false;
  }
-@@ -2090,7 +2123,12 @@
+@@ -2089,8 +2122,20 @@
+ 
      main_document_view->on_view_size_change(main_window_width, main_window_height);
      main_document_view->open_document(path, &this->is_render_invalidated);
-     if (!doc()){
+-    if (!doc()){
 -        // failed to open document
++    bool open_failed = !doc();
++    if (!open_failed) {
++        // mupdf can return a document object for a file it could not really parse
++        int page_count = doc()->num_pages();
++        open_failed = page_count <= 0;
++    }
++
++    if (open_failed){
 +        // failed to open document: tell the user instead of failing silently
 +        if (qEnvironmentVariableIsEmpty("PAPERNOTE_NO_UI")) {
 +            QMessageBox::warning(this, "无法打开文件",
@@ -188,7 +201,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
          return;
      }
      adjust_two_page_mode_document_zoom_and_offset(doc()->get_path());
-@@ -2111,7 +2149,7 @@
+@@ -2111,7 +2156,7 @@
      if (has_document) {
          //setWindowTitle(QString::fromStdWString(path.get_path()));
          if (file_name.size() > 0) {
@@ -197,7 +210,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
          }
          else {
              setWindowTitle(QString::fromStdWString(path));
-@@ -6145,9 +6183,268 @@
+@@ -6145,6 +6190,265 @@
      else {
          change_selected_highlight_type(symbol);
          return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
@@ -289,7 +302,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
 +                markdown += QString("**批注**：%1\n\n").arg(entry.note);
 +            }
 +        }
-     }
++    }
 +
 +    QFile export_file(export_path);
 +    if (!export_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -326,8 +339,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
 +    }
 +
 +    return export_path.toStdWString();
- }
- 
++}
++
 +void MainWidget::show_home_dialog(bool auto_show) {
 +    std::vector<std::pair<std::wstring, std::wstring>> recent_books;
 +    if (db_manager) {
@@ -460,13 +473,10 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
 +
 +    if (open_document_button && message_box.clickedButton() == open_document_button) {
 +        run_ui_command("open_document");
-+    }
-+}
-+
- void MainWidget::change_selected_highlight_type(char new_type) {
-     if (selected_highlight_index != -1) {
-         doc()->update_highlight_type(selected_highlight_index, new_type);
-@@ -7554,7 +7851,13 @@
+     }
+ }
+ 
+@@ -7554,7 +7858,13 @@
              std::unique_ptr<Command> subcommand = std::get<std::unique_ptr<Command>>(std::move(subitem));
              std::string command_name = subcommand->get_human_readable_name();
  
@@ -481,7 +491,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
              actions.push_back(action);
              connect(action, &QAction::triggered, [&, command_name, subcommand = std::move(subcommand)]() mutable {
                  //execute_macro_if_enabled(command_name.toStdWString());
-@@ -11547,7 +11850,7 @@
+@@ -11547,7 +11857,7 @@
              key_mappings = command_key_mappings[command];
          }
  
@@ -490,7 +500,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
  
          if (key_mappings.size() > 0){
              action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
-@@ -11567,11 +11870,128 @@
+@@ -11567,11 +11877,128 @@
  
      }
      else {
@@ -499,14 +509,14 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
          for (auto&& child : items->children) {
              create_menu_from_menu_node(menu, child, command_key_mappings);
          }
-     }
++    }
 +}
 +
 +void MainWidget::run_ui_command(const std::string& command) {
 +    auto cmd = command_manager->get_command_with_name(this, command);
 +    if (cmd) {
 +        handle_command_types(std::move(cmd), 0);
-+    }
+     }
 +}
 +
 +void MainWidget::goto_page_from_edit() {
@@ -620,7 +630,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
  }
  
  QMenuBar* MainWidget::create_main_menu_bar(){
-@@ -11580,6 +12000,7 @@
+@@ -11580,6 +12007,7 @@
          "File",
          "",
          {
@@ -628,7 +638,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
              new MenuNode{ "open_document", "", {}},
              new MenuNode { "open_prev_doc", "", {}},
              new MenuNode { "open_document_embedded", "", {}},
-@@ -11809,19 +12230,37 @@
+@@ -11809,21 +12237,39 @@
      auto command_key_mappings = input_handler->get_command_key_mappings();
      QMenuBar* menu_bar = new QMenuBar(this);
      for (auto top_level_menu : top_level_menus) {
@@ -660,8 +670,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
 +            "<p>在 Sioyek 基础上新增：高亮/书签导出 Markdown（Ctrl+Shift+E）、"
 +            "中文菜单与快速上手引导、全新图标与品牌名。</p>"
 +            "<p>源码：<a href='https://github.com/lottshin/PaperNote'>github.com/lottshin/PaperNote</a></p>");
-+    });
-+
+     });
+ 
 +    // Show the Chinese quick start once, on the very first launch.
 +    QTimer::singleShot(1200, this, [this](){
 +        QSettings settings("PaperNote", "PaperNote");
@@ -669,10 +679,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp--- a/pdf_vi
 +            settings.setValue("quickstart_shown", true);
 +            show_quickstart_dialog();
 +        }
-     });
- 
++    });
++
      for (auto top_level_menu : top_level_menus) {
-diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h--- a/pdf_viewer/main_widget.h
+         delete_menu_nodes(top_level_menu);
+     }
+diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
+--- a/pdf_viewer/main_widget.h
 +++ b/pdf_viewer/main_widget.h
 @@ -26,6 +26,8 @@
  class SelectionIndicator;
@@ -708,7 +721,8 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h--- a/pdf_viewer
      void handle_goto_highlight();
      void handle_goto_highlight_global();
      void handle_goto_toc();
-diff --git a/pdf_viewer/config.cpp b/pdf_viewer/config.cpp--- a/pdf_viewer/config.cpp
+diff --git a/pdf_viewer/config.cpp b/pdf_viewer/config.cpp
+--- a/pdf_viewer/config.cpp
 +++ b/pdf_viewer/config.cpp
 @@ -229,9 +229,9 @@
  float SMOOTH_SCROLL_SPEED = 3.0f;
@@ -722,7 +736,8 @@ diff --git a/pdf_viewer/config.cpp b/pdf_viewer/config.cpp--- a/pdf_viewer/confi
  std::wstring CONTEXT_MENU_ITEMS_FOR_SELECTED_TEXT = L"copy|add_highlight(a)|add_highlight(b)|add_highlight(c)";
  std::wstring CONTEXT_MENU_ITEMS_FOR_LINKS = L"";
  std::wstring CONTEXT_MENU_ITEMS_FOR_HIGHLIGHTS = L"delete_highlight|edit_selected_annotation|add_highlight(a)|add_highlight(b)|add_highlight(c)";
-diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config--- a/pdf_viewer/keys.config
+diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config
+--- a/pdf_viewer/keys.config
 +++ b/pdf_viewer/keys.config
 @@ -184,6 +184,12 @@
  goto_highlight_g gH
@@ -737,7 +752,8 @@ diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config--- a/pdf_viewer/key
  
  # Sets the highlight type to be used for other operations (the default highlight type is 'a')
  #set_select_highlight_type
-diff --git a/pdf_viewer_build_config.pro b/pdf_viewer_build_config.pro--- a/pdf_viewer_build_config.pro
+diff --git a/pdf_viewer_build_config.pro b/pdf_viewer_build_config.pro
+--- a/pdf_viewer_build_config.pro
 +++ b/pdf_viewer_build_config.pro
 @@ -154,7 +154,7 @@
      QMAKE_CXXFLAGS += /MP
@@ -757,7 +773,8 @@ diff --git a/pdf_viewer_build_config.pro b/pdf_viewer_build_config.pro--- a/pdf_
      QMAKE_INFO_PLIST = resources/Info.plist
      LIBS += -framework AppKit
      OBJECTIVE_SOURCES += pdf_viewer/macos_specific.mm
-diff --git a/resources/Info.plist b/resources/Info.plist--- a/resources/Info.plist
+diff --git a/resources/Info.plist b/resources/Info.plist
+--- a/resources/Info.plist
 +++ b/resources/Info.plist
 @@ -7,7 +7,11 @@
  	<key>CFBundleIconFile</key>
@@ -772,7 +789,9 @@ diff --git a/resources/Info.plist b/resources/Info.plist--- a/resources/Info.pli
  	<key>CFBundlePackageType</key>
  	<string>APPL</string>
  	<key>CFBundleSignature</key>
-diff --git a/pdf_viewer/ui_translation.h b/pdf_viewer/ui_translation.hnew file mode 100644--- /dev/null
+diff --git a/pdf_viewer/ui_translation.h b/pdf_viewer/ui_translation.h
+new file mode 100644
+--- /dev/null
 +++ b/pdf_viewer/ui_translation.h
 @@ -0,0 +1,202 @@
 +#pragma once

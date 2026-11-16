@@ -2122,7 +2122,14 @@ void MainWidget::open_document(const std::wstring& path, std::optional<float> of
 
     main_document_view->on_view_size_change(main_window_width, main_window_height);
     main_document_view->open_document(path, &this->is_render_invalidated);
-    if (!doc()){
+    bool open_failed = !doc();
+    if (!open_failed) {
+        // mupdf can return a document object for a file it could not really parse
+        int page_count = doc()->num_pages();
+        open_failed = page_count <= 0;
+    }
+
+    if (open_failed){
         // failed to open document: tell the user instead of failing silently
         if (qEnvironmentVariableIsEmpty("PAPERNOTE_NO_UI")) {
             QMessageBox::warning(this, "无法打开文件",
