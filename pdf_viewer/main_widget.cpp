@@ -62,6 +62,9 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QToolBar>
+#include <QDockWidget>
+#include <QTabWidget>
+#include <QTreeWidget>
 #include <QDialog>
 #include <QListWidget>
 #include <QTabBar>
@@ -1923,6 +1926,13 @@ void MainWidget::validate_ui() {
     }
 
     refresh_document_tabbar();
+
+    if (sidebar && sidebar->isVisible()) {
+        std::wstring current_path = main_document_view_has_document() ? doc()->get_path() : std::wstring();
+        if (current_path != sidebar_doc_path) {
+            refresh_sidebar();
+        }
+    }
 
     if (last_highlight_swatch != select_highlight_type) {
         update_highlight_swatch_state();
@@ -12164,6 +12174,198 @@ void MainWidget::update_highlight_swatch_state() {
     last_highlight_swatch = select_highlight_type;
 }
 
+void MainWidget::goto_page_number(int page_index) {
+    if (page_index < 0) {
+        return;
+    }
+    execute_command(L"goto_page_with_page_number", std::to_wstring(page_index + 1), false);
+}
+
+void MainWidget::create_sidebar() {
+    sidebar = new QDockWidget("侧栏", this);
+    sidebar->setObjectName("papernote_sidebar");
+    sidebar->setFeatures(QDockWidget::NoDockWidgetFeatures);
+    sidebar->setAllowedAreas(Qt::LeftDockWidgetArea);
+    sidebar->setMinimumWidth(220);
+    sidebar->setMaximumWidth(320);
+    sidebar->setTitleBarWidget(new QWidget(sidebar));
+    sidebar->setStyleSheet("QDockWidget { background: #1a1920; }");
+
+    sidebar_tabs = new QTabWidget(sidebar);
+    sidebar_tabs->setObjectName("papernote_sidebar_tabs");
+    sidebar_tabs->setDocumentMode(true);
+    sidebar_tabs->setStyleSheet(
+        "QTabWidget::pane { border: none; background: #1a1920; }"
+        "QTabBar::tab { background: transparent; color: #a9a6ba; padding: 7px 16px;"
+        " border-bottom: 2px solid transparent; }"
+        "QTabBar::tab:selected { color: #ffffff; border-bottom: 2px solid #8b6cff; }"
+        "QTabBar::tab:hover:!selected { color: #d8d5e6; }"
+    );
+
+    toc_tree = new QTreeWidget(sidebar_tabs);
+    toc_tree->setObjectName("papernote_toc");
+    toc_tree->setHeaderHidden(true);
+    toc_tree->setStyleSheet(
+        "QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; font-size: 12.5px; }"
+        "QTreeWidget::item { padding: 5px 2px; }"
+        "QTreeWidget::item:selected { background: #3a3350; }"
+    );
+    QObject::connect(toc_tree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
+        int page = item->data(0, Qt::UserRole).toInt();
+        if (page >= 0) {
+            goto_page_number(page);
+        }
+    });
+
+    thumbnails = new QListWidget(sidebar_tabs);
+    thumbnails->setObjectName("papernote_thumbnails");
+    thumbnails->setViewMode(QListView::IconMode);
+    thumbnails->setIconSize(QSize(130, 168));
+    thumbnails->setGridSize(QSize(156, 202));
+    thumbnails->setResizeMode(QListView::Adjust);
+    thumbnails->setMovement(QListView::Static);
+    thumbnails->setSpacing(4);
+    thumbnails->setStyleSheet(
+        "QListWidget { background: #1a1920; border: none; color: #c9c6d8; font-size: 11.5px; }"
+        "QListWidget::item { padding: 6px; border-radius: 8px; }"
+        "QListWidget::item:selected { background: #3a3350; color: #ffffff; }"
+    );
+    QObject::connect(thumbnails, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
+        int page = item->data(Qt::UserRole).toInt();
+        if (page >= 0) {
+            goto_page_number(page);
+        }
+    });
+
+    sidebar_tabs->addTab(toc_tree, "目录");
+    sidebar_tabs->addTab(thumbnails, "页面");
+    sidebar->setWidget(sidebar_tabs);
+
+    addDockWidget(Qt::LeftDockWidgetArea, sidebar);
+
+    thumbnail_timer = new QTimer(this);
+    thumbnail_timer->setInterval(20);
+    QObject::connect(thumbnail_timer, &QTimer::timeout, this, [this]() { load_next_thumbnail(); });
+
+    QObject::connect(sidebar, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+        if (visible) {
+            refresh_sidebar();
+        }
+        if (sidebar_action) {
+            QSignalBlocker blocker(sidebar_action);
+            sidebar_action->setChecked(visible);
+        }
+    });
+
+    sidebar->hide();
+}
+
+void MainWidget::toggle_sidebar() {
+    if (!sidebar) {
+        create_sidebar();
+    }
+    sidebar->setVisible(!sidebar->isVisible());
+    if (sidebar->isVisible()) {
+        refresh_sidebar();
+    }
+}
+
+void MainWidget::refresh_sidebar() {
+    if (!sidebar || !sidebar->isVisible()) {
+        return;
+    }
+
+    if (!main_document_view_has_document()) {
+        toc_tree->clear();
+        thumbnails->clear();
+        sidebar_doc_path.clear();
+        if (thumbnail_timer) {
+            thumbnail_timer->stop();
+        }
+        return;
+    }
+
+    std::wstring path = doc()->get_path();
+    if (path == sidebar_doc_path && thumbnails->count() > 0) {
+        return;
+    }
+
+    sidebar_doc_path = path;
+    populate_toc();
+    populate_thumbnails();
+}
+
+void MainWidget::populate_toc() {
+    toc_tree->clear();
+    if (!main_document_view_has_document()) {
+        return;
+    }
+
+    const std::vector<TocNode*>& toc = doc()->get_toc();
+    if (toc.empty()) {
+        QTreeWidgetItem* empty = new QTreeWidgetItem(toc_tree);
+        empty->setText(0, "此文档没有目录");
+        empty->setFlags(Qt::NoItemFlags);
+        return;
+    }
+
+    std::function<void(QTreeWidgetItem*, TocNode*)> add_node = [&](QTreeWidgetItem* parent, TocNode* node) {
+        QTreeWidgetItem* item = parent ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(toc_tree);
+        item->setText(0, QString::fromStdWString(node->title));
+        item->setData(0, Qt::UserRole, node->page);
+        for (TocNode* child : node->children) {
+            add_node(item, child);
+        }
+    };
+
+    for (TocNode* node : toc) {
+        add_node(nullptr, node);
+    }
+    toc_tree->expandToDepth(0);
+}
+
+void MainWidget::populate_thumbnails() {
+    thumbnails->clear();
+    thumbnail_next_page = 0;
+    if (!main_document_view_has_document()) {
+        return;
+    }
+
+    int page_count = doc()->num_pages();
+    for (int i = 0; i < page_count; i++) {
+        QListWidgetItem* item = new QListWidgetItem(QString("第 %1 页").arg(i + 1), thumbnails);
+        item->setData(Qt::UserRole, i);
+        item->setSizeHint(QSize(140, 188));
+        item->setTextAlignment(Qt::AlignHCenter);
+    }
+
+    if (thumbnail_timer) {
+        thumbnail_timer->start();
+    }
+}
+
+void MainWidget::load_next_thumbnail() {
+    if (!main_document_view_has_document()) {
+        thumbnail_timer->stop();
+        return;
+    }
+
+    if (thumbnail_next_page >= thumbnails->count()) {
+        thumbnail_timer->stop();
+        return;
+    }
+
+    int page = thumbnail_next_page++;
+    fz_pixmap* pixmap = doc()->get_small_pixmap(page);
+    if (!pixmap || !pixmap->samples) {
+        return;
+    }
+
+    QImage image(pixmap->samples, pixmap->w, pixmap->h, pixmap->stride, QImage::Format_RGB888);
+    QImage scaled = image.scaledToWidth(130, Qt::SmoothTransformation).copy();
+    thumbnails->item(page)->setIcon(QIcon(QPixmap::fromImage(scaled)));
+}
+
 void MainWidget::create_main_toolbar() {
     main_toolbar = new QToolBar("工具栏", this);
     main_toolbar->setObjectName("papernote_toolbar");
@@ -12232,6 +12434,14 @@ void MainWidget::create_main_toolbar() {
     add_button("fit", "适应宽度", "让页面宽度适应窗口", [this]() {
         run_ui_command("fit_to_page_width");
     });
+
+    main_toolbar->addSeparator();
+
+    QAction* sidebar_toggle = add_button("sidebar", "侧栏", "显示/隐藏目录与页面缩略图（F4）", [this]() {
+        toggle_sidebar();
+    });
+    sidebar_toggle->setCheckable(true);
+    sidebar_action = sidebar_toggle;
 
     main_toolbar->addSeparator();
 

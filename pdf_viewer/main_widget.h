@@ -30,6 +30,10 @@ class QToolBar;
 class QAction;
 class QTabBar;
 class QToolButton;
+class QDockWidget;
+class QTabWidget;
+class QTreeWidget;
+class QListWidget;
 class QTextEdit;
 class QTimer;
 class QDragEvent;
@@ -371,6 +375,16 @@ public:
     QLineEdit* search_edit = nullptr;
     std::vector<QToolButton*> highlight_swatches;
     char last_highlight_swatch = 0;
+
+    // PaperNote sidebar (outline + page thumbnails)
+    QDockWidget* sidebar = nullptr;
+    QTabWidget* sidebar_tabs = nullptr;
+    QTreeWidget* toc_tree = nullptr;
+    QListWidget* thumbnails = nullptr;
+    QTimer* thumbnail_timer = nullptr;
+    QAction* sidebar_action = nullptr;
+    std::wstring sidebar_doc_path;
+    int thumbnail_next_page = 0;
     QAction* select_highlight_action = nullptr;
 
     // PaperNote document tabs
@@ -684,6 +698,13 @@ public:
     void refresh_document_tabbar();
     void show_preferences_dialog();
     void update_highlight_swatch_state();
+    void create_sidebar();
+    void toggle_sidebar();
+    void refresh_sidebar();
+    void populate_toc();
+    void populate_thumbnails();
+    void load_next_thumbnail();
+    void goto_page_number(int page_index);
     void run_ui_command(const std::string& command);
     void goto_page_from_edit();
     void handle_goto_highlight();

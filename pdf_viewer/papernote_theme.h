@@ -66,6 +66,10 @@ QListWidget {
 }
 QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #2c2a36; }
 QListWidget::item:selected { background: #55467e; }
+QTabWidget::pane { border: none; background: #1a1920; }
+QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; }
+QTreeWidget::item { padding: 5px 2px; }
+QTreeWidget::item:selected { background: #3a3350; }
 QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
 QScrollBar::handle:vertical { background: #3f3c4e; border-radius: 4px; min-height: 28px; }
 QScrollBar::handle:vertical:hover { background: #55506a; }
@@ -202,6 +206,13 @@ inline QIcon icon(const QString& name, const QColor& color = kText, int size = 6
         painter.setBrush(color);
         painter.drawEllipse(QPointF(16 * u, 22 * u), 1.2 * u, 1.2 * u);
         painter.setBrush(Qt::NoBrush);
+    }
+    else if (name == "sidebar") {
+        painter.drawRect(QRectF(5 * u, 8 * u, 22 * u, 17 * u));
+        line(12, 8, 12, 25);
+        line(15, 13, 24, 13);
+        line(15, 17, 24, 17);
+        line(15, 21, 24, 21);
     }
     else if (name == "page") {
         QPainterPath path;

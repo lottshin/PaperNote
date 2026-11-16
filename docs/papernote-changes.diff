@@ -17,7 +17,7 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
      virtual std::optional<Requirement> next_requirement(MainWidget* widget) {
          if (symbol == 0) {
              return Requirement{ RequirementType::Symbol, "symbol" };
-@@ -2671,7 +2673,59 @@
+@@ -2671,9 +2673,74 @@
      std::vector<char> special_symbols() {
          std::vector<char> res = { '_', };
          return res;
@@ -35,6 +35,19 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +    }
 +};
 +
++class ToggleSidebarCommand : public Command {
++public:
++    static inline const std::string cname = "toggle_sidebar";
++    static inline const std::string hname = "Toggle the outline and thumbnail sidebar";
++    ToggleSidebarCommand(MainWidget* w) : Command(cname, w) {};
++
++    void perform() {
++        widget->toggle_sidebar();
++    }
++
++    bool requires_document() { return false; }
++};
++
 +class PreferencesDialogCommand : public Command {
 +public:
 +    static inline const std::string cname = "preferences_dialog";
@@ -45,11 +58,11 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +        // Defer: --execute-command runs inside a QLocalSocket callback, and a
 +        // modal dialog with a nested event loop there can crash on return.
 +        QTimer::singleShot(0, widget, [w = widget]() { w->show_preferences_dialog(); });
-+    }
+     }
 +
 +    bool requires_document() { return false; }
-+};
-+
+ };
+ 
 +class HomeCommand : public Command {
 +public:
 +    static inline const std::string cname = "home";
@@ -71,13 +84,15 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +
 +    void perform() {
 +        QTimer::singleShot(0, widget, [w = widget]() { w->show_quickstart_dialog(); });
-     }
++    }
 +
 +    bool requires_document() { return false; }
- };
- 
++};
++
  class CommandPaletteCommand : public Command {
-@@ -7290,6 +7344,10 @@
+ public:
+     static inline const std::string cname = "command_palette";
+@@ -7290,6 +7357,11 @@
      register_command<CopyScreenshotToScratchpad>();
      register_command<CopyScreenshotToClipboard>();
      register_command<AddHighlightCommand>();
@@ -85,6 +100,7 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +    register_command<QuickstartCommand>();
 +    register_command<HomeCommand>();
 +    register_command<PreferencesDialogCommand>();
++    register_command<ToggleSidebarCommand>();
      register_command<GotoTableOfContentsCommand>();
      register_command<GotoHighlightCommand>();
      register_command<IncreaseFreetextBookmarkFontSizeCommand>();
@@ -165,13 +181,16 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <iostream>
  #include <vector>
  #include <string>
-@@ -56,6 +59,20 @@
+@@ -56,6 +59,23 @@
  #include <qguiapplication.h>
  #include <qmimedata.h>
  #include <qscreen.h>
 +#include <QMessageBox>
 +#include <QSettings>
 +#include <QToolBar>
++#include <QDockWidget>
++#include <QTabWidget>
++#include <QTreeWidget>
 +#include <QDialog>
 +#include <QListWidget>
 +#include <QTabBar>
@@ -186,7 +205,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <QGestureEvent>
  #include <qjsonarray.h>
  #include <qjsonobject.h>
-@@ -130,6 +147,7 @@
+@@ -130,6 +150,7 @@
  extern float VISUAL_MARK_NEXT_PAGE_FRACTION;
  extern float VISUAL_MARK_NEXT_PAGE_THRESHOLD;
  extern float SMALL_PIXMAP_SCALE;
@@ -194,7 +213,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  extern std::wstring EXECUTE_COMMANDS[26];
  extern float HIGHLIGHT_COLORS[26 * 3];
  extern int STATUS_BAR_FONT_SIZE;
-@@ -1369,6 +1387,9 @@
+@@ -1369,6 +1390,9 @@
      }
      menu_bar = create_main_menu_bar();
      setMenuBar(menu_bar);
@@ -204,7 +223,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
      menu_bar->stackUnder(text_command_line_edit_container);
  #endif
  
-@@ -1883,6 +1904,30 @@
+@@ -1883,6 +1907,37 @@
  void MainWidget::validate_ui() {
      status_label_left->setText(QString::fromStdWString(get_status_string(false)));
      status_label_right->setText(QString::fromStdWString(get_status_string(true)));
@@ -228,6 +247,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +
 +    refresh_document_tabbar();
 +
++    if (sidebar && sidebar->isVisible()) {
++        std::wstring current_path = main_document_view_has_document() ? doc()->get_path() : std::wstring();
++        if (current_path != sidebar_doc_path) {
++            refresh_sidebar();
++        }
++    }
++
 +    if (last_highlight_swatch != select_highlight_type) {
 +        update_highlight_swatch_state();
 +    }
@@ -235,7 +261,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
      update_command_hints_position();
      is_ui_invalidated = false;
  }
-@@ -2089,8 +2134,20 @@
+@@ -2089,8 +2144,20 @@
  
      main_document_view->on_view_size_change(main_window_width, main_window_height);
      main_document_view->open_document(path, &this->is_render_invalidated);
@@ -258,7 +284,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          return;
      }
      adjust_two_page_mode_document_zoom_and_offset(doc()->get_path());
-@@ -2111,7 +2168,7 @@
+@@ -2111,7 +2178,7 @@
      if (has_document) {
          //setWindowTitle(QString::fromStdWString(path.get_path()));
          if (file_name.size() > 0) {
@@ -267,7 +293,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          }
          else {
              setWindowTitle(QString::fromStdWString(path));
-@@ -6145,9 +6202,272 @@
+@@ -6145,7 +6212,270 @@
      else {
          change_selected_highlight_type(symbol);
          return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
@@ -313,7 +339,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    if (entries.empty()) {
 +        set_status_message(L"当前文档没有高亮或书签，无需导出");
 +        return L"";
-     }
++    }
 +
 +    std::stable_sort(entries.begin(), entries.end(), [](const NoteEntry& lhs, const NoteEntry& rhs) {
 +        if (lhs.page != rhs.page) {
@@ -396,8 +422,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    }
 +
 +    return export_path.toStdWString();
- }
- 
++}
++
 +void MainWidget::show_home_dialog(bool auto_show) {
 +    std::vector<std::pair<std::wstring, std::wstring>> recent_books;
 +    if (db_manager) {
@@ -528,19 +554,17 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    if (!main_document_view_has_document()) {
 +        open_document_button = message_box.addButton("打开 PDF", QMessageBox::AcceptRole);
 +        open_document_button->setProperty("primary", true);
-+    }
+     }
 +    message_box.addButton("知道了", QMessageBox::RejectRole);
 +    message_box.exec();
 +
 +    if (open_document_button && message_box.clickedButton() == open_document_button) {
 +        run_ui_command("open_document");
 +    }
-+}
-+
+ }
+ 
  void MainWidget::change_selected_highlight_type(char new_type) {
-     if (selected_highlight_index != -1) {
-         doc()->update_highlight_type(selected_highlight_index, new_type);
-@@ -7554,7 +7874,13 @@
+@@ -7554,7 +7884,13 @@
              std::unique_ptr<Command> subcommand = std::get<std::unique_ptr<Command>>(std::move(subitem));
              std::string command_name = subcommand->get_human_readable_name();
  
@@ -555,7 +579,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              actions.push_back(action);
              connect(action, &QAction::triggered, [&, command_name, subcommand = std::move(subcommand)]() mutable {
                  //execute_macro_if_enabled(command_name.toStdWString());
-@@ -11547,7 +11873,7 @@
+@@ -11547,7 +11883,7 @@
              key_mappings = command_key_mappings[command];
          }
  
@@ -564,7 +588,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  
          if (key_mappings.size() > 0){
              action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
-@@ -11567,19 +11893,450 @@
+@@ -11567,19 +11903,650 @@
  
      }
      else {
@@ -581,8 +605,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    if (cmd) {
 +        handle_command_types(std::move(cmd), 0);
      }
- }
- 
++}
++
 +void MainWidget::goto_page_from_edit() {
 +    if (!page_number_edit) {
 +        return;
@@ -717,8 +741,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        }
 +        refresh_document_tabbar();
 +    });
-+}
-+
+ }
+ 
 +void MainWidget::refresh_document_tabbar() {
 +    if (!document_tabs || !document_tabs_bar) {
 +        return;
@@ -840,6 +864,198 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    last_highlight_swatch = select_highlight_type;
 +}
 +
++void MainWidget::goto_page_number(int page_index) {
++    if (page_index < 0) {
++        return;
++    }
++    execute_command(L"goto_page_with_page_number", std::to_wstring(page_index + 1), false);
++}
++
++void MainWidget::create_sidebar() {
++    sidebar = new QDockWidget("侧栏", this);
++    sidebar->setObjectName("papernote_sidebar");
++    sidebar->setFeatures(QDockWidget::NoDockWidgetFeatures);
++    sidebar->setAllowedAreas(Qt::LeftDockWidgetArea);
++    sidebar->setMinimumWidth(220);
++    sidebar->setMaximumWidth(320);
++    sidebar->setTitleBarWidget(new QWidget(sidebar));
++    sidebar->setStyleSheet("QDockWidget { background: #1a1920; }");
++
++    sidebar_tabs = new QTabWidget(sidebar);
++    sidebar_tabs->setObjectName("papernote_sidebar_tabs");
++    sidebar_tabs->setDocumentMode(true);
++    sidebar_tabs->setStyleSheet(
++        "QTabWidget::pane { border: none; background: #1a1920; }"
++        "QTabBar::tab { background: transparent; color: #a9a6ba; padding: 7px 16px;"
++        " border-bottom: 2px solid transparent; }"
++        "QTabBar::tab:selected { color: #ffffff; border-bottom: 2px solid #8b6cff; }"
++        "QTabBar::tab:hover:!selected { color: #d8d5e6; }"
++    );
++
++    toc_tree = new QTreeWidget(sidebar_tabs);
++    toc_tree->setObjectName("papernote_toc");
++    toc_tree->setHeaderHidden(true);
++    toc_tree->setStyleSheet(
++        "QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; font-size: 12.5px; }"
++        "QTreeWidget::item { padding: 5px 2px; }"
++        "QTreeWidget::item:selected { background: #3a3350; }"
++    );
++    QObject::connect(toc_tree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
++        int page = item->data(0, Qt::UserRole).toInt();
++        if (page >= 0) {
++            goto_page_number(page);
++        }
++    });
++
++    thumbnails = new QListWidget(sidebar_tabs);
++    thumbnails->setObjectName("papernote_thumbnails");
++    thumbnails->setViewMode(QListView::IconMode);
++    thumbnails->setIconSize(QSize(130, 168));
++    thumbnails->setGridSize(QSize(156, 202));
++    thumbnails->setResizeMode(QListView::Adjust);
++    thumbnails->setMovement(QListView::Static);
++    thumbnails->setSpacing(4);
++    thumbnails->setStyleSheet(
++        "QListWidget { background: #1a1920; border: none; color: #c9c6d8; font-size: 11.5px; }"
++        "QListWidget::item { padding: 6px; border-radius: 8px; }"
++        "QListWidget::item:selected { background: #3a3350; color: #ffffff; }"
++    );
++    QObject::connect(thumbnails, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
++        int page = item->data(Qt::UserRole).toInt();
++        if (page >= 0) {
++            goto_page_number(page);
++        }
++    });
++
++    sidebar_tabs->addTab(toc_tree, "目录");
++    sidebar_tabs->addTab(thumbnails, "页面");
++    sidebar->setWidget(sidebar_tabs);
++
++    addDockWidget(Qt::LeftDockWidgetArea, sidebar);
++
++    thumbnail_timer = new QTimer(this);
++    thumbnail_timer->setInterval(20);
++    QObject::connect(thumbnail_timer, &QTimer::timeout, this, [this]() { load_next_thumbnail(); });
++
++    QObject::connect(sidebar, &QDockWidget::visibilityChanged, this, [this](bool visible) {
++        if (visible) {
++            refresh_sidebar();
++        }
++        if (sidebar_action) {
++            QSignalBlocker blocker(sidebar_action);
++            sidebar_action->setChecked(visible);
++        }
++    });
++
++    sidebar->hide();
++}
++
++void MainWidget::toggle_sidebar() {
++    if (!sidebar) {
++        create_sidebar();
++    }
++    sidebar->setVisible(!sidebar->isVisible());
++    if (sidebar->isVisible()) {
++        refresh_sidebar();
++    }
++}
++
++void MainWidget::refresh_sidebar() {
++    if (!sidebar || !sidebar->isVisible()) {
++        return;
++    }
++
++    if (!main_document_view_has_document()) {
++        toc_tree->clear();
++        thumbnails->clear();
++        sidebar_doc_path.clear();
++        if (thumbnail_timer) {
++            thumbnail_timer->stop();
++        }
++        return;
++    }
++
++    std::wstring path = doc()->get_path();
++    if (path == sidebar_doc_path && thumbnails->count() > 0) {
++        return;
++    }
++
++    sidebar_doc_path = path;
++    populate_toc();
++    populate_thumbnails();
++}
++
++void MainWidget::populate_toc() {
++    toc_tree->clear();
++    if (!main_document_view_has_document()) {
++        return;
++    }
++
++    const std::vector<TocNode*>& toc = doc()->get_toc();
++    if (toc.empty()) {
++        QTreeWidgetItem* empty = new QTreeWidgetItem(toc_tree);
++        empty->setText(0, "此文档没有目录");
++        empty->setFlags(Qt::NoItemFlags);
++        return;
++    }
++
++    std::function<void(QTreeWidgetItem*, TocNode*)> add_node = [&](QTreeWidgetItem* parent, TocNode* node) {
++        QTreeWidgetItem* item = parent ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(toc_tree);
++        item->setText(0, QString::fromStdWString(node->title));
++        item->setData(0, Qt::UserRole, node->page);
++        for (TocNode* child : node->children) {
++            add_node(item, child);
++        }
++    };
++
++    for (TocNode* node : toc) {
++        add_node(nullptr, node);
++    }
++    toc_tree->expandToDepth(0);
++}
++
++void MainWidget::populate_thumbnails() {
++    thumbnails->clear();
++    thumbnail_next_page = 0;
++    if (!main_document_view_has_document()) {
++        return;
++    }
++
++    int page_count = doc()->num_pages();
++    for (int i = 0; i < page_count; i++) {
++        QListWidgetItem* item = new QListWidgetItem(QString("第 %1 页").arg(i + 1), thumbnails);
++        item->setData(Qt::UserRole, i);
++        item->setSizeHint(QSize(140, 188));
++        item->setTextAlignment(Qt::AlignHCenter);
++    }
++
++    if (thumbnail_timer) {
++        thumbnail_timer->start();
++    }
++}
++
++void MainWidget::load_next_thumbnail() {
++    if (!main_document_view_has_document()) {
++        thumbnail_timer->stop();
++        return;
++    }
++
++    if (thumbnail_next_page >= thumbnails->count()) {
++        thumbnail_timer->stop();
++        return;
++    }
++
++    int page = thumbnail_next_page++;
++    fz_pixmap* pixmap = doc()->get_small_pixmap(page);
++    if (!pixmap || !pixmap->samples) {
++        return;
++    }
++
++    QImage image(pixmap->samples, pixmap->w, pixmap->h, pixmap->stride, QImage::Format_RGB888);
++    QImage scaled = image.scaledToWidth(130, Qt::SmoothTransformation).copy();
++    thumbnails->item(page)->setIcon(QIcon(QPixmap::fromImage(scaled)));
++}
++
 +void MainWidget::create_main_toolbar() {
 +    main_toolbar = new QToolBar("工具栏", this);
 +    main_toolbar->setObjectName("papernote_toolbar");
@@ -908,6 +1124,14 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    add_button("fit", "适应宽度", "让页面宽度适应窗口", [this]() {
 +        run_ui_command("fit_to_page_width");
 +    });
++
++    main_toolbar->addSeparator();
++
++    QAction* sidebar_toggle = add_button("sidebar", "侧栏", "显示/隐藏目录与页面缩略图（F4）", [this]() {
++        toggle_sidebar();
++    });
++    sidebar_toggle->setCheckable(true);
++    sidebar_action = sidebar_toggle;
 +
 +    main_toolbar->addSeparator();
 +
@@ -1016,7 +1240,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              new MenuNode{ "open_document", "", {}},
              new MenuNode { "open_prev_doc", "", {}},
              new MenuNode { "open_document_embedded", "", {}},
-@@ -11809,19 +12566,37 @@
+@@ -11809,19 +12776,37 @@
      auto command_key_mappings = input_handler->get_command_key_mappings();
      QMenuBar* menu_bar = new QMenuBar(this);
      for (auto top_level_menu : top_level_menus) {
@@ -1063,7 +1287,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 --- a/pdf_viewer/main_widget.h
 +++ b/pdf_viewer/main_widget.h
-@@ -26,6 +26,10 @@
+@@ -26,6 +26,14 @@
  class SelectionIndicator;
  class QLocalSocket;
  class QLineEdit;
@@ -1071,10 +1295,14 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +class QAction;
 +class QTabBar;
 +class QToolButton;
++class QDockWidget;
++class QTabWidget;
++class QTreeWidget;
++class QListWidget;
  class QTextEdit;
  class QTimer;
  class QDragEvent;
-@@ -360,6 +364,18 @@
+@@ -360,6 +368,28 @@
      QLabel* status_label_left = nullptr;
      QLabel* status_label_right = nullptr;
      QWidget* status_label = nullptr;
@@ -1085,6 +1313,16 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    QLineEdit* search_edit = nullptr;
 +    std::vector<QToolButton*> highlight_swatches;
 +    char last_highlight_swatch = 0;
++
++    // PaperNote sidebar (outline + page thumbnails)
++    QDockWidget* sidebar = nullptr;
++    QTabWidget* sidebar_tabs = nullptr;
++    QTreeWidget* toc_tree = nullptr;
++    QListWidget* thumbnails = nullptr;
++    QTimer* thumbnail_timer = nullptr;
++    QAction* sidebar_action = nullptr;
++    std::wstring sidebar_doc_path;
++    int thumbnail_next_page = 0;
 +    QAction* select_highlight_action = nullptr;
 +
 +    // PaperNote document tabs
@@ -1093,7 +1331,7 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
      int text_suggestion_index = 0;
  
      int last_pause_rest_of_document_page = -1;
-@@ -660,6 +676,16 @@
+@@ -660,6 +690,23 @@
      void handle_show_marks();
      void handle_goto_bookmark_global();
      std::wstring handle_add_highlight(char symbol);
@@ -1105,6 +1343,13 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    void refresh_document_tabbar();
 +    void show_preferences_dialog();
 +    void update_highlight_swatch_state();
++    void create_sidebar();
++    void toggle_sidebar();
++    void refresh_sidebar();
++    void populate_toc();
++    void populate_thumbnails();
++    void load_next_thumbnail();
++    void goto_page_number(int page_index);
 +    void run_ui_command(const std::string& command);
 +    void goto_page_from_edit();
      void handle_goto_highlight();
@@ -1128,7 +1373,7 @@ diff --git a/pdf_viewer/config.cpp b/pdf_viewer/config.cpp
 diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config
 --- a/pdf_viewer/keys.config
 +++ b/pdf_viewer/keys.config
-@@ -184,6 +184,12 @@
+@@ -184,6 +184,14 @@
  goto_highlight_g gH
  # Left click on a highlight and then press the `delete_highlight` shortcut to delete it.
  delete_highlight dh
@@ -1138,6 +1383,8 @@ diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config
 +
 +# Show PaperNote's Chinese quick start guide (fork addition)
 +help <f2>
++# Toggle the outline / thumbnail sidebar (fork addition)
++toggle_sidebar <f4>
  
  # Sets the highlight type to be used for other operations (the default highlight type is 'a')
  #set_select_highlight_type
@@ -1182,7 +1429,7 @@ diff --git a/pdf_viewer/ui_translation.h b/pdf_viewer/ui_translation.h
 new file mode 100644
 --- /dev/null
 +++ b/pdf_viewer/ui_translation.h
-@@ -0,0 +1,203 @@
+@@ -0,0 +1,204 @@
 +#pragma once
 +
 +// Chinese (zh-CN) UI strings for the PaperNote fork.
@@ -1229,6 +1476,7 @@ new file mode 100644
 +        // File / 文件
 +        {"home", "最近打开…"},
 +        {"preferences_dialog", "图形化设置…"},
++        {"toggle_sidebar", "显示/隐藏侧栏"},
 +        {"copy", "复制"},
 +        {"export_highlights", "导出笔记"},
 +        {"help", "快速上手"},
@@ -1390,7 +1638,7 @@ diff --git a/pdf_viewer/papernote_theme.h b/pdf_viewer/papernote_theme.h
 new file mode 100644
 --- /dev/null
 +++ b/pdf_viewer/papernote_theme.h
-@@ -0,0 +1,233 @@
+@@ -0,0 +1,244 @@
 +#pragma once
 +
 +// PaperNote visual theme.
@@ -1459,6 +1707,10 @@ new file mode 100644
 +}
 +QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #2c2a36; }
 +QListWidget::item:selected { background: #55467e; }
++QTabWidget::pane { border: none; background: #1a1920; }
++QTreeWidget { background: #1a1920; border: none; color: #dcd9e8; }
++QTreeWidget::item { padding: 5px 2px; }
++QTreeWidget::item:selected { background: #3a3350; }
 +QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
 +QScrollBar::handle:vertical { background: #3f3c4e; border-radius: 4px; min-height: 28px; }
 +QScrollBar::handle:vertical:hover { background: #55506a; }
@@ -1595,6 +1847,13 @@ new file mode 100644
 +        painter.setBrush(color);
 +        painter.drawEllipse(QPointF(16 * u, 22 * u), 1.2 * u, 1.2 * u);
 +        painter.setBrush(Qt::NoBrush);
++    }
++    else if (name == "sidebar") {
++        painter.drawRect(QRectF(5 * u, 8 * u, 22 * u, 17 * u));
++        line(12, 8, 12, 25);
++        line(15, 13, 24, 13);
++        line(15, 17, 24, 17);
++        line(15, 21, 24, 21);
 +    }
 +    else if (name == "page") {
 +        QPainterPath path;

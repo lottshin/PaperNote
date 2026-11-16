@@ -44,6 +44,7 @@ inline QString papernote_tr_command(const std::string& command, const QString& f
         // File / 文件
         {"home", "最近打开…"},
         {"preferences_dialog", "图形化设置…"},
+        {"toggle_sidebar", "显示/隐藏侧栏"},
         {"copy", "复制"},
         {"export_highlights", "导出笔记"},
         {"help", "快速上手"},

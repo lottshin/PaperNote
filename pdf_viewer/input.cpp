@@ -2687,6 +2687,19 @@ public:
     }
 };
 
+class ToggleSidebarCommand : public Command {
+public:
+    static inline const std::string cname = "toggle_sidebar";
+    static inline const std::string hname = "Toggle the outline and thumbnail sidebar";
+    ToggleSidebarCommand(MainWidget* w) : Command(cname, w) {};
+
+    void perform() {
+        widget->toggle_sidebar();
+    }
+
+    bool requires_document() { return false; }
+};
+
 class PreferencesDialogCommand : public Command {
 public:
     static inline const std::string cname = "preferences_dialog";
@@ -7348,6 +7361,7 @@ CommandManager::CommandManager(ConfigManager* config_manager) {
     register_command<QuickstartCommand>();
     register_command<HomeCommand>();
     register_command<PreferencesDialogCommand>();
+    register_command<ToggleSidebarCommand>();
     register_command<GotoTableOfContentsCommand>();
     register_command<GotoHighlightCommand>();
     register_command<IncreaseFreetextBookmarkFontSizeCommand>();
