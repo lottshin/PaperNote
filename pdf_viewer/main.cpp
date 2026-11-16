@@ -28,6 +28,7 @@
 #include <qabstractitemmodel.h>
 #include <qopenglshaderprogram.h>
 #include <qtimer.h>
+#include <QSettings>
 #include <qdatetime.h>
 #include <qstackedwidget.h>
 #include <qboxlayout.h>
@@ -724,7 +725,18 @@ int main(int argc, char* args[]) {
 
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
     OpenWithApplication app(argc, args);
-    papernote::apply_app_theme(app);
+    {
+        QSettings settings("PaperNote", "PaperNote");
+        QString theme = settings.value("ui_theme", "system").toString();
+        papernote::ThemeMode mode = papernote::ThemeMode::System;
+        if (theme == "light") {
+            mode = papernote::ThemeMode::Light;
+        }
+        else if (theme == "dark") {
+            mode = papernote::ThemeMode::Dark;
+        }
+        papernote::apply(app, mode);
+    }
 
     int font_id = QFontDatabase::addApplicationFont(":/resources/fonts/JetBrainsMono.ttf");
 

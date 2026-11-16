@@ -373,7 +373,8 @@ public:
     QToolBar* main_toolbar = nullptr;
     QLineEdit* page_number_edit = nullptr;
     QLineEdit* search_edit = nullptr;
-    std::vector<QToolButton*> highlight_swatches;
+    QToolButton* color_button = nullptr;
+    std::vector<QAction*> color_actions;
     char last_highlight_swatch = 0;
 
     // PaperNote sidebar (outline + page thumbnails)
@@ -383,6 +384,9 @@ public:
     QListWidget* thumbnails = nullptr;
     QTimer* thumbnail_timer = nullptr;
     QAction* sidebar_action = nullptr;
+    QAction* theme_action = nullptr;
+    std::vector<std::pair<QAction*, QString>> themed_icon_actions;
+    std::vector<std::pair<QToolButton*, QString>> themed_tool_buttons;
     std::wstring sidebar_doc_path;
     int thumbnail_next_page = 0;
     QAction* select_highlight_action = nullptr;
@@ -698,6 +702,9 @@ public:
     void refresh_document_tabbar();
     void show_preferences_dialog();
     void update_highlight_swatch_state();
+    void apply_theme_to_widgets();
+    void set_theme_mode(int mode);
+    void toggle_theme();
     void create_sidebar();
     void toggle_sidebar();
     void refresh_sidebar();

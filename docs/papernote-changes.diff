@@ -118,7 +118,15 @@ diff --git a/pdf_viewer/input.h b/pdf_viewer/input.h
 diff --git a/pdf_viewer/main.cpp b/pdf_viewer/main.cpp
 --- a/pdf_viewer/main.cpp
 +++ b/pdf_viewer/main.cpp
-@@ -66,6 +66,7 @@
+@@ -28,6 +28,7 @@
+ #include <qabstractitemmodel.h>
+ #include <qopenglshaderprogram.h>
+ #include <qtimer.h>
++#include <QSettings>
+ #include <qdatetime.h>
+ #include <qstackedwidget.h>
+ #include <qboxlayout.h>
+@@ -66,6 +67,7 @@
  #include "pdf_view_opengl_widget.h"
  #include "config.h"
  #include "main_widget.h"
@@ -126,7 +134,7 @@ diff --git a/pdf_viewer/main.cpp b/pdf_viewer/main.cpp
  #include "path.h"
  #include "RunGuard.h"
  #include "checksum.h"
-@@ -434,6 +435,10 @@
+@@ -434,6 +436,10 @@
          window->invalidate_render();
      }
  }
@@ -137,7 +145,7 @@ diff --git a/pdf_viewer/main.cpp b/pdf_viewer/main.cpp
  
  MainWidget* handle_args(const QStringList& arguments, QLocalSocket* origin=nullptr) {
      std::optional<int> page = -1;
-@@ -492,6 +497,8 @@
+@@ -492,6 +498,8 @@
                      pdf_file_name = tutorial_path.get_path();
                  }
              }
@@ -146,15 +154,26 @@ diff --git a/pdf_viewer/main.cpp b/pdf_viewer/main.cpp
          }
      }
  
-@@ -717,6 +724,7 @@
+@@ -717,6 +725,18 @@
  
      QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
      OpenWithApplication app(argc, args);
-+    papernote::apply_app_theme(app);
++    {
++        QSettings settings("PaperNote", "PaperNote");
++        QString theme = settings.value("ui_theme", "system").toString();
++        papernote::ThemeMode mode = papernote::ThemeMode::System;
++        if (theme == "light") {
++            mode = papernote::ThemeMode::Light;
++        }
++        else if (theme == "dark") {
++            mode = papernote::ThemeMode::Dark;
++        }
++        papernote::apply(app, mode);
++    }
  
      int font_id = QFontDatabase::addApplicationFont(":/resources/fonts/JetBrainsMono.ttf");
  
-@@ -945,6 +953,13 @@
+@@ -945,6 +965,13 @@
      QCoreApplication::processEvents();
  
      handle_args(app.arguments());
@@ -181,7 +200,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <iostream>
  #include <vector>
  #include <string>
-@@ -56,6 +59,23 @@
+@@ -56,6 +59,24 @@
  #include <qguiapplication.h>
  #include <qmimedata.h>
  #include <qscreen.h>
@@ -196,6 +215,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +#include <QTabBar>
 +#include <QToolButton>
 +#include <QCheckBox>
++#include <QComboBox>
 +#include <QVBoxLayout>
 +#include <QAction>
 +#include <QSignalBlocker>
@@ -205,7 +225,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <QGestureEvent>
  #include <qjsonarray.h>
  #include <qjsonobject.h>
-@@ -130,6 +150,7 @@
+@@ -130,6 +151,7 @@
  extern float VISUAL_MARK_NEXT_PAGE_FRACTION;
  extern float VISUAL_MARK_NEXT_PAGE_THRESHOLD;
  extern float SMALL_PIXMAP_SCALE;
@@ -213,17 +233,18 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  extern std::wstring EXECUTE_COMMANDS[26];
  extern float HIGHLIGHT_COLORS[26 * 3];
  extern int STATUS_BAR_FONT_SIZE;
-@@ -1369,6 +1390,9 @@
+@@ -1369,6 +1391,10 @@
      }
      menu_bar = create_main_menu_bar();
      setMenuBar(menu_bar);
 +    create_main_toolbar();
 +    create_document_tabbar();
 +
++
      menu_bar->stackUnder(text_command_line_edit_container);
  #endif
  
-@@ -1883,6 +1907,37 @@
+@@ -1883,6 +1909,37 @@
  void MainWidget::validate_ui() {
      status_label_left->setText(QString::fromStdWString(get_status_string(false)));
      status_label_right->setText(QString::fromStdWString(get_status_string(true)));
@@ -261,7 +282,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
      update_command_hints_position();
      is_ui_invalidated = false;
  }
-@@ -2089,8 +2144,20 @@
+@@ -2089,8 +2146,20 @@
  
      main_document_view->on_view_size_change(main_window_width, main_window_height);
      main_document_view->open_document(path, &this->is_render_invalidated);
@@ -284,7 +305,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          return;
      }
      adjust_two_page_mode_document_zoom_and_offset(doc()->get_path());
-@@ -2111,7 +2178,7 @@
+@@ -2111,7 +2180,7 @@
      if (has_document) {
          //setWindowTitle(QString::fromStdWString(path.get_path()));
          if (file_name.size() > 0) {
@@ -293,7 +314,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          }
          else {
              setWindowTitle(QString::fromStdWString(path));
-@@ -6145,7 +6212,270 @@
+@@ -6145,6 +6214,269 @@
      else {
          change_selected_highlight_type(symbol);
          return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
@@ -479,9 +500,9 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    layout->setSpacing(10);
 +
 +    QLabel* title = new QLabel("PaperNote", &dialog);
-+    title->setStyleSheet("font-size: 28px; font-weight: 600; color: #1f1e1c;");
++    title->setStyleSheet(QString("font-size: 28px; font-weight: 600; color: %1;").arg(papernote::text().name()));
 +    QLabel* subtitle = new QLabel("继续阅读最近的文档，或打开新的 PDF", &dialog);
-+    subtitle->setStyleSheet("color: #6f6a64; font-size: 13px;");
++    subtitle->setStyleSheet(QString("color: %1; font-size: 13px;").arg(papernote::text_muted().name()));
 +    layout->addWidget(title);
 +    layout->addSpacing(6);
 +    layout->addWidget(subtitle);
@@ -494,7 +515,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    list->setUniformItemSizes(true);
 +    for (const RecentEntry& entry : entries) {
 +        QListWidgetItem* item = new QListWidgetItem(entry.title, list);
-+        item->setIcon(papernote::icon("page", papernote::kTextMuted, 36));
++        item->setIcon(papernote::icon("page", papernote::text_muted(), 36));
 +        item->setData(Qt::UserRole, entry.path);
 +        item->setToolTip(entry.path);
 +        item->setSizeHint(QSize(0, 44));
@@ -554,17 +575,16 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    if (!main_document_view_has_document()) {
 +        open_document_button = message_box.addButton("打开 PDF", QMessageBox::AcceptRole);
 +        open_document_button->setProperty("primary", true);
-     }
++    }
 +    message_box.addButton("知道了", QMessageBox::RejectRole);
 +    message_box.exec();
 +
 +    if (open_document_button && message_box.clickedButton() == open_document_button) {
 +        run_ui_command("open_document");
-+    }
+     }
  }
  
- void MainWidget::change_selected_highlight_type(char new_type) {
-@@ -7554,7 +7884,13 @@
+@@ -7554,7 +7886,13 @@
              std::unique_ptr<Command> subcommand = std::get<std::unique_ptr<Command>>(std::move(subitem));
              std::string command_name = subcommand->get_human_readable_name();
  
@@ -579,7 +599,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              actions.push_back(action);
              connect(action, &QAction::triggered, [&, command_name, subcommand = std::move(subcommand)]() mutable {
                  //execute_macro_if_enabled(command_name.toStdWString());
-@@ -11547,7 +11883,7 @@
+@@ -11547,7 +11885,7 @@
              key_mappings = command_key_mappings[command];
          }
  
@@ -588,7 +608,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  
          if (key_mappings.size() > 0){
              action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
-@@ -11567,19 +11903,654 @@
+@@ -11567,19 +11905,711 @@
  
      }
      else {
@@ -596,7 +616,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        auto menu = parent->addMenu(papernote_tr_menu(items->name));
          for (auto&& child : items->children) {
              create_menu_from_menu_node(menu, child, command_key_mappings);
-         }
++        }
 +    }
 +}
 +
@@ -604,9 +624,9 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    auto cmd = command_manager->get_command_with_name(this, command);
 +    if (cmd) {
 +        handle_command_types(std::move(cmd), 0);
-     }
- }
- 
++    }
++}
++
 +void MainWidget::goto_page_from_edit() {
 +    if (!page_number_edit) {
 +        return;
@@ -628,11 +648,6 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    document_tabs_bar->setObjectName("papernote_tabs_bar");
 +    document_tabs_bar->setMovable(false);
 +    document_tabs_bar->setFloatable(false);
-+    document_tabs_bar->setStyleSheet(
-+        "QToolBar#papernote_tabs_bar { background: #f7f6f4; border: none;"
-+        " border-bottom: 1px solid #e7e3dd; padding: 2px 10px 0 10px; }"
-+    );
-+
 +    document_tabs = new QTabBar(document_tabs_bar);
 +    document_tabs->setExpanding(false);
 +    document_tabs->setMovable(false);
@@ -792,16 +807,16 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    layout->setSpacing(5);
 +
 +    QLabel* title = new QLabel("设置", &dialog);
-+    title->setStyleSheet("font-size: 26px; font-weight: 600; color: #1f1e1c;");
++    title->setStyleSheet(QString("font-size: 26px; font-weight: 600; color: %1;").arg(papernote::text().name()));
 +    QLabel* subtitle = new QLabel("修改会立即保存，对下次启动同样生效", &dialog);
-+    subtitle->setStyleSheet("color: #6f6a64; font-size: 12px;");
++    subtitle->setStyleSheet(QString("color: %1; font-size: 12px;").arg(papernote::text_muted().name()));
 +    layout->addWidget(title);
 +    layout->addWidget(subtitle);
 +    layout->addSpacing(8);
 +
 +    auto add_section = [&](const QString& text) {
 +        QLabel* label = new QLabel(text, &dialog);
-+        label->setStyleSheet("color: #6f6a64; font-size: 12px; font-weight: 600; margin-top: 12px;");
++        label->setStyleSheet(QString("color: %1; font-size: 12px; font-weight: 600; margin-top: 12px;").arg(papernote::text_muted().name()));
 +        layout->addWidget(label);
 +        layout->addSpacing(3);
 +    };
@@ -818,6 +833,23 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        });
 +        layout->addWidget(checkbox);
 +    };
++
++    add_section("外观");
++    {
++        QHBoxLayout* theme_row = new QHBoxLayout();
++        QLabel* theme_label = new QLabel("主题", &dialog);
++        theme_label->setStyleSheet(QString("color: %1; font-size: 13px;").arg(papernote::text().name()));
++        QComboBox* theme_box = new QComboBox(&dialog);
++        theme_box->addItems({"跟随系统", "浅色", "深色"});
++        theme_box->setCurrentIndex((int)papernote::requested_mode());
++        QObject::connect(theme_box, &QComboBox::currentIndexChanged, this, [this](int index) {
++            set_theme_mode(index);
++        });
++        theme_row->addWidget(theme_label);
++        theme_row->addStretch();
++        theme_row->addWidget(theme_box);
++        layout->addLayout(theme_row);
++    }
 +
 +    add_section("阅读");
 +    add_toggle("高亮按页面位置排序", L"sort_highlights_by_location");
@@ -850,21 +882,6 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    dialog.exec();
 +}
 +
-+void MainWidget::update_highlight_swatch_state() {
-+    for (size_t i = 0; i < highlight_swatches.size(); i++) {
-+        int idx = (int)i * 3;
-+        QColor color = QColor::fromRgbF(
-+            HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
-+        bool selected = (select_highlight_type == (char)('a' + i));
-+        highlight_swatches[i]->setStyleSheet(QString(
-+            "QToolButton { background: %1; border: %2; border-radius: 10px; }"
-+            "QToolButton:hover { border-color: #0075de; }")
-+            .arg(color.name())
-+            .arg(selected ? QString("2px solid #0075de") : QString("2px solid #ffffff")));
-+    }
-+    last_highlight_swatch = select_highlight_type;
-+}
-+
 +void MainWidget::goto_page_number(int page_index) {
 +    if (page_index < 0) {
 +        return;
@@ -877,52 +894,32 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    sidebar->setObjectName("papernote_sidebar");
 +    sidebar->setFeatures(QDockWidget::NoDockWidgetFeatures);
 +    sidebar->setAllowedAreas(Qt::LeftDockWidgetArea);
-+    sidebar->setMinimumWidth(220);
-+    sidebar->setMaximumWidth(320);
++    sidebar->setMinimumWidth(240);
++    sidebar->setMaximumWidth(340);
 +    sidebar->setTitleBarWidget(new QWidget(sidebar));
-+    sidebar->setStyleSheet("QDockWidget { background: #f7f6f4; border-right: 1px solid #e7e3dd; }");
 +
 +    sidebar_tabs = new QTabWidget(sidebar);
 +    sidebar_tabs->setObjectName("papernote_sidebar_tabs");
 +    sidebar_tabs->setDocumentMode(true);
-+    sidebar_tabs->setStyleSheet(
-+        "QTabWidget::pane { border: none; background: #f7f6f4; }"
-+        "QTabBar::tab { background: transparent; color: #6f6a64; padding: 7px 16px;"
-+        " border-bottom: 2px solid transparent; }"
-+        "QTabBar::tab:selected { color: #1f1e1c; border-bottom: 2px solid #0075de; }"
-+        "QTabBar::tab:hover:!selected { color: #3c3a36; }"
-+    );
 +
 +    toc_tree = new QTreeWidget(sidebar_tabs);
 +    toc_tree->setObjectName("papernote_toc");
 +    toc_tree->setHeaderHidden(true);
-+    toc_tree->setStyleSheet(
-+        "QTreeWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 12.5px; }"
-+        "QTreeWidget::item { padding: 5px 2px; }"
-+        "QTreeWidget::item:hover { background: #efebe6; }"
-+        "QTreeWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
-+    );
 +    QObject::connect(toc_tree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
 +        int page = item->data(0, Qt::UserRole).toInt();
 +        if (page >= 0) {
 +            goto_page_number(page);
-+        }
+         }
 +    });
 +
 +    thumbnails = new QListWidget(sidebar_tabs);
 +    thumbnails->setObjectName("papernote_thumbnails");
 +    thumbnails->setViewMode(QListView::IconMode);
-+    thumbnails->setIconSize(QSize(130, 168));
-+    thumbnails->setGridSize(QSize(156, 202));
++    thumbnails->setIconSize(QSize(100, 129));
++    thumbnails->setGridSize(QSize(118, 162));
 +    thumbnails->setResizeMode(QListView::Adjust);
 +    thumbnails->setMovement(QListView::Static);
-+    thumbnails->setSpacing(4);
-+    thumbnails->setStyleSheet(
-+        "QListWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 11.5px; }"
-+        "QListWidget::item { padding: 6px; border-radius: 8px; }"
-+        "QListWidget::item:hover { background: #efebe6; }"
-+        "QListWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
-+    );
++    thumbnails->setSpacing(2);
 +    QObject::connect(thumbnails, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
 +        int page = item->data(Qt::UserRole).toInt();
 +        if (page >= 0) {
@@ -956,13 +953,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +void MainWidget::toggle_sidebar() {
 +    if (!sidebar) {
 +        create_sidebar();
-+    }
+     }
 +    sidebar->setVisible(!sidebar->isVisible());
 +    if (sidebar->isVisible()) {
 +        refresh_sidebar();
 +    }
-+}
-+
+ }
+ 
 +void MainWidget::refresh_sidebar() {
 +    if (!sidebar || !sidebar->isVisible()) {
 +        return;
@@ -1028,7 +1025,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    for (int i = 0; i < page_count; i++) {
 +        QListWidgetItem* item = new QListWidgetItem(QString("第 %1 页").arg(i + 1), thumbnails);
 +        item->setData(Qt::UserRole, i);
-+        item->setSizeHint(QSize(140, 188));
++        item->setSizeHint(QSize(112, 150));
 +        item->setTextAlignment(Qt::AlignHCenter);
 +    }
 +
@@ -1055,8 +1052,103 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    }
 +
 +    QImage image(pixmap->samples, pixmap->w, pixmap->h, pixmap->stride, QImage::Format_RGB888);
-+    QImage scaled = image.scaledToWidth(130, Qt::SmoothTransformation).copy();
++    QImage scaled = image.scaledToWidth(100, Qt::SmoothTransformation).copy();
 +    thumbnails->item(page)->setIcon(QIcon(QPixmap::fromImage(scaled)));
++}
++
++void MainWidget::update_highlight_swatch_state() {
++    if (!color_button) {
++        return;
++    }
++
++    int idx = (select_highlight_type - 'a') * 3;
++    if (idx < 0 || idx >= 26 * 3) {
++        idx = 0;
++    }
++    QColor color = QColor::fromRgbF(
++        HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
++
++    QPixmap dot(32, 32);
++    dot.fill(Qt::transparent);
++    {
++        QPainter painter(&dot);
++        painter.setRenderHint(QPainter::Antialiasing, true);
++        painter.setBrush(color);
++        painter.setPen(QPen(papernote::border(), 2));
++        painter.drawEllipse(7, 7, 18, 18);
++    }
++    color_button->setIcon(QIcon(dot));
++
++    for (size_t i = 0; i < color_actions.size(); i++) {
++        color_actions[i]->setChecked(select_highlight_type == (char)('a' + i));
++    }
++    last_highlight_swatch = select_highlight_type;
++}
++
++void MainWidget::apply_theme_to_widgets() {
++    QColor color = papernote::text();
++    for (auto& entry : themed_icon_actions) {
++        entry.first->setIcon(papernote::icon(entry.second, color));
++    }
++    for (auto& entry : themed_tool_buttons) {
++        entry.first->setIcon(papernote::icon(entry.second, color));
++    }
++    if (theme_action) {
++        theme_action->setIcon(papernote::icon(papernote::is_dark() ? "sun" : "moon", color));
++    }
++
++    update_highlight_swatch_state();
++
++    QString status_style = QString("background-color: %1; color: %2; border-top: 1px solid %3;")
++        .arg(papernote::surface().name(), papernote::text_muted().name(), papernote::border().name());
++    if (status_label) {
++        status_label->setStyleSheet(status_style);
++    }
++    if (status_label_left) {
++        status_label_left->setStyleSheet(status_style);
++    }
++    if (status_label_right) {
++        status_label_right->setStyleSheet(status_style);
++    }
++    if (text_command_line_edit_container) {
++        text_command_line_edit_container->setStyleSheet(status_style);
++    }
++
++    if (sidebar && sidebar->isVisible()) {
++        sidebar_doc_path.clear();
++        refresh_sidebar();
++    }
++}
++
++void MainWidget::set_theme_mode(int mode) {
++    papernote::ThemeMode theme_mode = papernote::ThemeMode::System;
++    if (mode == 1) {
++        theme_mode = papernote::ThemeMode::Light;
++    }
++    else if (mode == 2) {
++        theme_mode = papernote::ThemeMode::Dark;
++    }
++
++    papernote::apply(*qApp, theme_mode);
++
++    QSettings settings("PaperNote", "PaperNote");
++    settings.setValue("ui_theme", mode == 0 ? "system" : (mode == 1 ? "light" : "dark"));
++
++    config_manager->deserialize_config("dark_mode_background_color", L"0.098 0.098 0.094");
++
++    if (papernote::is_dark()) {
++        set_dark_mode();
++    }
++    else {
++        set_light_mode();
++    }
++    invalidate_render();
++
++    apply_theme_to_widgets();
++}
++
++void MainWidget::toggle_theme() {
++    set_theme_mode(papernote::is_dark() ? 1 : 2);
 +}
 +
 +void MainWidget::create_main_toolbar() {
@@ -1064,103 +1156,82 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    main_toolbar->setObjectName("papernote_toolbar");
 +    main_toolbar->setMovable(false);
 +    main_toolbar->setFloatable(false);
++    main_toolbar->setIconSize(QSize(18, 18));
 +    main_toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-+    main_toolbar->setIconSize(QSize(19, 19));
-+    main_toolbar->setStyleSheet(
-+        "QToolBar#papernote_toolbar { background: #ffffff; border: none;"
-+        " border-bottom: 1px solid #e7e3dd; padding: 6px 10px; spacing: 2px; }"
-+        "QToolBar#papernote_toolbar QToolButton { color: #3c3a36; background: transparent;"
-+        " border: 1px solid transparent; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; }"
-+        "QToolBar#papernote_toolbar QToolButton:disabled { color: #b9b4ad; }"
-+        "QToolBar#papernote_toolbar QToolButton:hover { background: #f5f3f0; }"
-+        "QToolBar#papernote_toolbar QToolButton:pressed { background: #efebe6; }"
-+        "QToolBar#papernote_toolbar QToolButton:checked {"
-+        " background: #e9f4fd; border-color: #bbddf7; color: #0b5fa5; }"
-+        "QToolBar#papernote_toolbar::separator { width: 1px; background: #eae6e0; margin: 6px 9px; }"
-+        "QLineEdit { background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;"
-+        " border-radius: 8px; padding: 4px 8px; font-size: 12.5px; }"
-+        "QLineEdit:focus { background: #ffffff; border-color: #0075de; }"
-+    );
 +
 +    auto add_button = [this](const QString& icon_name, const QString& text, const QString& tooltip,
-+                             std::function<void()> fn) {
-+        QAction* action = main_toolbar->addAction(papernote::icon(icon_name), " " + text);
++                             std::function<void()> fn, bool show_text) {
++        QAction* action = main_toolbar->addAction(
++            papernote::icon(icon_name, papernote::text()), show_text ? text : QString());
 +        action->setToolTip(tooltip);
++        themed_icon_actions.push_back({action, icon_name});
 +        connect(action, &QAction::triggered, this, [fn](bool) { fn(); });
 +        return action;
 +    };
 +
-+    add_button("open", "打开 PDF", "打开一个 PDF 文件（也可以把文件直接拖进窗口）", [this]() {
-+        run_ui_command("open_document");
-+    });
-+
-+    add_button("recent", "最近", "从最近阅读的文档里继续", [this]() {
-+        show_home_dialog();
-+    });
++    add_button("open", "打开", "打开 PDF（也可以把文件直接拖进窗口）",
++               [this]() { run_ui_command("open_document"); }, true);
++    add_button("recent", "最近", "从最近阅读的文档继续",
++               [this]() { show_home_dialog(); }, true);
 +
 +    main_toolbar->addSeparator();
 +
-+    add_button("prev", "上一页", "上一页（也可以按 PageUp 或 Shift+空格）", [this]() {
-+        run_ui_command("previous_page");
-+    });
++    add_button("prev", "上一页", "上一页（PageUp / Shift+空格）",
++               [this]() { run_ui_command("previous_page"); }, false);
 +
 +    page_number_edit = new QLineEdit(main_toolbar);
-+    page_number_edit->setFixedWidth(92);
-+    page_number_edit->setFixedHeight(30);
++    page_number_edit->setFixedWidth(84);
++    page_number_edit->setFixedHeight(28);
 +    page_number_edit->setAlignment(Qt::AlignCenter);
-+    page_number_edit->setToolTip("输入页码后回车即可跳转");
++    page_number_edit->setToolTip("输入页码后回车跳转");
 +    page_number_edit->setClearButtonEnabled(false);
 +    main_toolbar->addWidget(page_number_edit);
 +    connect(page_number_edit, &QLineEdit::returnPressed, this, &MainWidget::goto_page_from_edit);
 +
-+    add_button("next", "下一页", "下一页（也可以按 PageDown 或空格）", [this]() {
-+        run_ui_command("next_page");
-+    });
++    add_button("next", "下一页", "下一页（PageDown / 空格）",
++               [this]() { run_ui_command("next_page"); }, false);
 +
 +    main_toolbar->addSeparator();
 +
-+    add_button("zoom_out", "缩小", "缩小", [this]() {
-+        run_ui_command("zoom_out");
-+    });
-+    add_button("zoom_in", "放大", "放大", [this]() {
-+        run_ui_command("zoom_in");
-+    });
-+    add_button("fit", "适应宽度", "让页面宽度适应窗口", [this]() {
-+        run_ui_command("fit_to_page_width");
-+    });
++    add_button("zoom_out", "缩小", "缩小", [this]() { run_ui_command("zoom_out"); }, false);
++    add_button("zoom_in", "放大", "放大", [this]() { run_ui_command("zoom_in"); }, false);
++    add_button("fit", "适应宽度", "让页面宽度适应窗口",
++               [this]() { run_ui_command("fit_to_page_width"); }, false);
 +
 +    main_toolbar->addSeparator();
 +
-+    QAction* sidebar_toggle = add_button("sidebar", "侧栏", "显示/隐藏目录与页面缩略图（F4）", [this]() {
-+        toggle_sidebar();
-+    });
-+    sidebar_toggle->setCheckable(true);
-+    sidebar_action = sidebar_toggle;
-+
-+    main_toolbar->addSeparator();
-+
-+    QAction* highlight_action = add_button("highlight", "高亮模式", "开启后，用鼠标选中文字就会自动加高亮；再点一次关闭", [this]() {
-+        is_select_highlight_mode = !is_select_highlight_mode;
-+        set_status_message(is_select_highlight_mode
-+            ? L"高亮模式：已开启，选中文字即可高亮（点工具栏按钮关闭）"
-+            : L"高亮模式：已关闭");
-+    });
++    QAction* highlight_action = add_button("highlight", "高亮模式",
++        "高亮模式：选中文字即可高亮，再点一次关闭", [this]() {
++            is_select_highlight_mode = !is_select_highlight_mode;
++            set_status_message(is_select_highlight_mode
++                ? L"高亮模式：已开启，选中文字即可高亮"
++                : L"高亮模式：已关闭");
++        }, false);
 +    highlight_action->setCheckable(true);
 +    select_highlight_action = highlight_action;
 +
-+    // Three quick colour swatches (a/b/c) from the user's highlight palette.
++    // Single "current highlight colour" chip with a small palette menu.
++    color_button = new QToolButton(main_toolbar);
++    color_button->setFixedSize(26, 26);
++    color_button->setPopupMode(QToolButton::InstantPopup);
++    color_button->setToolTip("高亮颜色（点开选择颜色）");
++    QMenu* color_menu = new QMenu(color_button);
 +    for (char letter = 'a'; letter <= 'c'; letter++) {
 +        int idx = (letter - 'a') * 3;
 +        QColor swatch_color = QColor::fromRgbF(
 +            HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
-+        QToolButton* swatch = new QToolButton(main_toolbar);
-+        swatch->setFixedSize(20, 20);
-+        swatch->setCursor(Qt::PointingHandCursor);
-+        swatch->setToolTip(QString("用这个颜色高亮（%1）").arg(QChar(letter)));
-+        swatch->setStyleSheet(QString(
-+            "QToolButton { background: %1; border: 2px solid #1e1d26; border-radius: 10px; }"
-+            "QToolButton:hover { border-color: #ffffff; }").arg(swatch_color.name()));
-+        connect(swatch, &QToolButton::clicked, this, [this, letter]() {
++        QPixmap dot(32, 32);
++        dot.fill(Qt::transparent);
++        {
++            QPainter painter(&dot);
++            painter.setRenderHint(QPainter::Antialiasing, true);
++            painter.setBrush(swatch_color);
++            painter.setPen(QPen(papernote::border(), 2));
++            painter.drawEllipse(7, 7, 18, 18);
++        }
++        QAction* action = color_menu->addAction(QIcon(dot), QString("颜色 %1").arg(QChar(letter)));
++        action->setCheckable(true);
++        connect(action, &QAction::triggered, this, [this, letter]() {
 +            select_highlight_type = letter;
 +            is_select_highlight_mode = true;
 +            if (select_highlight_action) {
@@ -1170,26 +1241,25 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            update_highlight_swatch_state();
 +            set_status_message(QString("高亮颜色：%1，选中文字即可高亮").arg(QChar(letter)).toStdWString());
 +        });
-+        highlight_swatches.push_back(swatch);
-+        main_toolbar->addWidget(swatch);
++        color_actions.push_back(action);
 +    }
++    color_button->setMenu(color_menu);
++    main_toolbar->addWidget(color_button);
 +
-+    add_button("bookmark", "加书签", "给当前页添加书签", [this]() {
-+        run_ui_command("add_bookmark");
-+    });
++    add_button("bookmark", "加书签", "给当前页添加书签",
++               [this]() { run_ui_command("add_bookmark"); }, false);
++    add_button("export", "导出笔记", "把高亮和书签导出为 Markdown",
++               [this]() { run_ui_command("export_highlights"); }, false);
 +
-+    add_button("export", "导出笔记", "把所有高亮和书签导出为 Markdown 笔记", [this]() {
-+        run_ui_command("export_highlights");
-+    });
-+
-+    main_toolbar->addSeparator();
-+
-+    main_toolbar->addSeparator();
++    // Flexible space: keep primary actions left, utilities right (modern app bar).
++    QWidget* toolbar_spacer = new QWidget(main_toolbar);
++    toolbar_spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
++    main_toolbar->addWidget(toolbar_spacer);
 +
 +    search_edit = new QLineEdit(main_toolbar);
-+    search_edit->setPlaceholderText("搜索文档内容…");
++    search_edit->setPlaceholderText("搜索文档…");
 +    search_edit->setFixedWidth(180);
-+    search_edit->setFixedHeight(30);
++    search_edit->setFixedHeight(28);
 +    search_edit->setClearButtonEnabled(true);
 +    main_toolbar->addWidget(search_edit);
 +    connect(search_edit, &QLineEdit::returnPressed, this, [this]() {
@@ -1207,31 +1277,38 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    auto add_result_button = [this](const QString& icon_name, const QString& tooltip,
 +                                    const std::string& command) {
 +        QToolButton* button = new QToolButton(main_toolbar);
-+        button->setIcon(papernote::icon(icon_name));
-+        button->setIconSize(QSize(17, 17));
-+        button->setFixedSize(26, 26);
++        button->setIcon(papernote::icon(icon_name, papernote::text()));
++        button->setIconSize(QSize(16, 16));
++        button->setFixedSize(24, 24);
 +        button->setAutoRaise(true);
 +        button->setToolTip(tooltip);
-+        button->setStyleSheet(
-+            "QToolButton { border: 1px solid transparent; border-radius: 6px; }"
-+            "QToolButton:hover { background: #f5f3f0; }");
++        themed_tool_buttons.push_back({button, icon_name});
 +        connect(button, &QToolButton::clicked, this, [this, command]() {
 +            run_ui_command(command);
 +        });
 +        main_toolbar->addWidget(button);
 +    };
-+
 +    add_result_button("prev", "上一个搜索结果（N）", "previous_item");
 +    add_result_button("next", "下一个搜索结果（n）", "next_item");
 +
 +    main_toolbar->addSeparator();
 +
-+    add_button("help", "帮助", "查看快速上手说明", [this]() {
-+        show_quickstart_dialog();
-+    });
++    QAction* sidebar_toggle = add_button("sidebar", "侧栏", "显示/隐藏目录与页面缩略图（F4）",
++                                         [this]() { toggle_sidebar(); }, false);
++    sidebar_toggle->setCheckable(true);
++    sidebar_action = sidebar_toggle;
++
++    theme_action = add_button("moon", "主题", "切换浅色 / 深色主题",
++                              [this]() { toggle_theme(); }, false);
++    add_button("help", "帮助", "快速上手（F2）",
++               [this]() { show_quickstart_dialog(); }, false);
 +
 +    addToolBar(Qt::TopToolBarArea, main_toolbar);
-+    update_highlight_swatch_state();
++    apply_theme_to_widgets();
++
++    if (papernote::is_dark()) {
++        set_dark_mode();
++    }
 +}
 +
  QMenuBar* MainWidget::create_main_menu_bar(){
@@ -1244,7 +1321,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              new MenuNode{ "open_document", "", {}},
              new MenuNode { "open_prev_doc", "", {}},
              new MenuNode { "open_document_embedded", "", {}},
-@@ -11809,19 +12780,37 @@
+@@ -11809,21 +12839,39 @@
      auto command_key_mappings = input_handler->get_command_key_mappings();
      QMenuBar* menu_bar = new QMenuBar(this);
      for (auto top_level_menu : top_level_menus) {
@@ -1276,8 +1353,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            "<p>在 Sioyek 基础上新增：高亮/书签导出 Markdown（Ctrl+Shift+E）、"
 +            "中文菜单与快速上手引导、全新图标与品牌名。</p>"
 +            "<p>源码：<a href='https://github.com/lottshin/PaperNote'>github.com/lottshin/PaperNote</a></p>");
-+    });
-+
+     });
+ 
 +    // Show the Chinese quick start once, on the very first launch.
 +    QTimer::singleShot(1200, this, [this](){
 +        QSettings settings("PaperNote", "PaperNote");
@@ -1285,9 +1362,11 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            settings.setValue("quickstart_shown", true);
 +            show_quickstart_dialog();
 +        }
-     });
- 
++    });
++
      for (auto top_level_menu : top_level_menus) {
+         delete_menu_nodes(top_level_menu);
+     }
 diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 --- a/pdf_viewer/main_widget.h
 +++ b/pdf_viewer/main_widget.h
@@ -1306,7 +1385,7 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
  class QTextEdit;
  class QTimer;
  class QDragEvent;
-@@ -360,6 +368,28 @@
+@@ -360,6 +368,32 @@
      QLabel* status_label_left = nullptr;
      QLabel* status_label_right = nullptr;
      QWidget* status_label = nullptr;
@@ -1315,7 +1394,8 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    QToolBar* main_toolbar = nullptr;
 +    QLineEdit* page_number_edit = nullptr;
 +    QLineEdit* search_edit = nullptr;
-+    std::vector<QToolButton*> highlight_swatches;
++    QToolButton* color_button = nullptr;
++    std::vector<QAction*> color_actions;
 +    char last_highlight_swatch = 0;
 +
 +    // PaperNote sidebar (outline + page thumbnails)
@@ -1325,6 +1405,9 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    QListWidget* thumbnails = nullptr;
 +    QTimer* thumbnail_timer = nullptr;
 +    QAction* sidebar_action = nullptr;
++    QAction* theme_action = nullptr;
++    std::vector<std::pair<QAction*, QString>> themed_icon_actions;
++    std::vector<std::pair<QToolButton*, QString>> themed_tool_buttons;
 +    std::wstring sidebar_doc_path;
 +    int thumbnail_next_page = 0;
 +    QAction* select_highlight_action = nullptr;
@@ -1335,7 +1418,7 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
      int text_suggestion_index = 0;
  
      int last_pause_rest_of_document_page = -1;
-@@ -660,6 +690,23 @@
+@@ -660,6 +694,26 @@
      void handle_show_marks();
      void handle_goto_bookmark_global();
      std::wstring handle_add_highlight(char symbol);
@@ -1347,6 +1430,9 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    void refresh_document_tabbar();
 +    void show_preferences_dialog();
 +    void update_highlight_swatch_state();
++    void apply_theme_to_widgets();
++    void set_theme_mode(int mode);
++    void toggle_theme();
 +    void create_sidebar();
 +    void toggle_sidebar();
 +    void refresh_sidebar();
@@ -1666,108 +1752,235 @@ diff --git a/pdf_viewer/papernote_theme.h b/pdf_viewer/papernote_theme.h
 new file mode 100644
 --- /dev/null
 +++ b/pdf_viewer/papernote_theme.h
-@@ -0,0 +1,245 @@
+@@ -0,0 +1,387 @@
 +#pragma once
 +
-+// PaperNote visual theme — warm minimal (Notion / Craft style):
-+// white canvas, warm neutral greys, whisper-thin borders, one blue accent.
++// PaperNote visual theme: warm-minimal light palette and a matching dark palette.
++// One stylesheet, generated from tokens, plus QPainter-drawn icons.
 +
 +#include <QApplication>
 +#include <QColor>
++#include <QGuiApplication>
 +#include <QIcon>
 +#include <QPainter>
 +#include <QPainterPath>
 +#include <QPalette>
 +#include <QPixmap>
 +#include <QString>
++#include <QStyleHints>
 +
 +namespace papernote {
 +
-+inline const QColor kBg(0xff, 0xff, 0xff);
-+inline const QColor kSurface(0xf7, 0xf6, 0xf4);
-+inline const QColor kSurfaceAlt(0xf1, 0xef, 0xec);
-+inline const QColor kBorder(0xe7, 0xe3, 0xdd);
-+inline const QColor kText(0x1f, 0x1e, 0x1c);
-+inline const QColor kTextMuted(0x6f, 0x6a, 0x64);
-+inline const QColor kAccent(0x00, 0x75, 0xde);
-+inline const QColor kAccentHover(0x00, 0x68, 0xc4);
-+inline const QColor kAccentSoft(0xe9, 0xf4, 0xfd);
-+inline const QColor kAccentText(0x0b, 0x5f, 0xa5);
++enum class ThemeMode { System = 0, Light = 1, Dark = 2 };
++
++inline ThemeMode& requested_mode() {
++    static ThemeMode mode = ThemeMode::Light;
++    return mode;
++}
++
++inline bool& dark_active() {
++    static bool dark = false;
++    return dark;
++}
++
++inline bool is_dark() {
++    return dark_active();
++}
++
++inline QColor bg() {
++    return is_dark() ? QColor(0x19, 0x19, 0x18) : QColor(0xff, 0xff, 0xff);
++}
++inline QColor surface() {
++    return is_dark() ? QColor(0x20, 0x20, 0x20) : QColor(0xf7, 0xf6, 0xf4);
++}
++inline QColor surface_alt() {
++    return is_dark() ? QColor(0x26, 0x26, 0x25) : QColor(0xf1, 0xef, 0xec);
++}
++inline QColor border() {
++    return is_dark() ? QColor(0x34, 0x33, 0x2f) : QColor(0xe7, 0xe3, 0xdd);
++}
++inline QColor text() {
++    return is_dark() ? QColor(0xec, 0xec, 0xea) : QColor(0x1f, 0x1e, 0x1c);
++}
++inline QColor text_muted() {
++    return is_dark() ? QColor(0x9a, 0x97, 0x91) : QColor(0x6f, 0x6a, 0x64);
++}
++inline QColor accent() {
++    return is_dark() ? QColor(0x23, 0x83, 0xe2) : QColor(0x00, 0x75, 0xde);
++}
++inline QColor accent_hover() {
++    return is_dark() ? QColor(0x3b, 0x93, 0xe8) : QColor(0x00, 0x68, 0xc4);
++}
++inline QColor accent_soft() {
++    return is_dark() ? QColor(0x17, 0x29, 0x3a) : QColor(0xe9, 0xf4, 0xfd);
++}
++inline QColor accent_text() {
++    return is_dark() ? QColor(0x8f, 0xc2, 0xf0) : QColor(0x0b, 0x5f, 0xa5);
++}
++
++inline ThemeMode system_mode() {
++#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
++    return QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark
++        ? ThemeMode::Dark
++        : ThemeMode::Light;
++#else
++    return ThemeMode::Light;
++#endif
++}
 +
 +inline QString app_stylesheet() {
-+    return QStringLiteral(R"QSS(
++    QString qss = QStringLiteral(R"QSS(
 +QToolTip {
-+    background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;
++    background: @bg; color: @text; border: 1px solid @border;
 +    border-radius: 6px; padding: 5px 8px; font-size: 12px;
 +}
 +QMenu {
-+    background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;
++    background: @bg; color: @text; border: 1px solid @border;
 +    border-radius: 10px; padding: 6px;
 +}
 +QMenu::item { padding: 7px 28px 7px 14px; border-radius: 6px; }
-+QMenu::item:selected { background: #e9f4fd; color: #0b5fa5; }
-+QMenu::separator { height: 1px; background: #eeeae4; margin: 5px 8px; }
-+QMessageBox, QDialog { background: #ffffff; }
-+QMessageBox QLabel { color: #1f1e1c; font-size: 13px; }
++QMenu::item:selected { background: @accentSoft; color: @accentText; }
++QMenu::separator { height: 1px; background: @border; margin: 5px 8px; }
++QMessageBox, QDialog { background: @bg; }
++QMessageBox QLabel { color: @text; font-size: 13px; }
 +QPushButton {
-+    background: #ffffff; color: #1f1e1c; border: 1px solid #ddd8d1;
++    background: @bg; color: @text; border: 1px solid @border;
 +    border-radius: 8px; padding: 7px 16px; font-size: 13px;
 +}
-+QPushButton:hover { background: #f7f6f4; }
-+QPushButton:pressed { background: #f1efec; }
++QPushButton:hover { background: @surface; }
++QPushButton:pressed { background: @surfaceAlt; }
 +QPushButton[primary="true"] {
-+    background: #0075de; color: #ffffff; border: 1px solid #0075de; font-weight: 600;
++    background: @accent; color: #ffffff; border: 1px solid @accent; font-weight: 600;
 +}
-+QPushButton[primary="true"]:hover { background: #0068c4; }
++QPushButton[primary="true"]:hover { background: @accentHover; }
 +QPushButton[ghost="true"] {
-+    background: transparent; border-color: transparent; color: #6f6a64;
++    background: transparent; border-color: transparent; color: @muted;
 +}
-+QPushButton[ghost="true"]:hover { background: #f5f3f0; color: #1f1e1c; }
-+QCheckBox { color: #1f1e1c; font-size: 13px; spacing: 8px; }
++QPushButton[ghost="true"]:hover { background: @surface; color: @text; }
++QCheckBox { color: @text; font-size: 13px; spacing: 8px; }
 +QLineEdit {
-+    background: #f7f6f4; color: #1f1e1c; border: 1px solid transparent;
-+    border-radius: 8px; padding: 5px 8px; selection-background-color: #cfe8fb;
++    background: @surface; color: @text; border: 1px solid transparent;
++    border-radius: 8px; padding: 5px 8px; selection-background-color: @accentSoft;
 +}
-+QLineEdit:focus { background: #ffffff; border-color: #0075de; }
++QLineEdit:focus { background: @bg; border-color: @accent; }
 +QListWidget {
-+    background: #ffffff; border: 1px solid #e7e3dd; border-radius: 10px;
-+    color: #1f1e1c; font-size: 13px;
++    background: @bg; border: 1px solid @border; border-radius: 10px;
++    color: @text; font-size: 13px;
 +}
-+QListWidget::item { padding: 9px 12px; border-bottom: 1px solid #f1efec; }
-+QListWidget::item:hover { background: #f7f6f4; }
-+QListWidget::item:selected { background: #f5f3f0; color: #1f1e1c; border-left: 3px solid #0075de; }
-+QTabWidget::pane { border: none; background: #ffffff; }
-+QTreeWidget { background: #ffffff; border: none; color: #1f1e1c; }
++QListWidget::item { padding: 9px 12px; border-bottom: 1px solid @border; }
++QListWidget::item:hover { background: @surface; }
++QListWidget::item:selected { background: @surface; color: @text; border-left: 3px solid @accent; }
++QTabWidget::pane { border: none; background: @bg; }
++QTreeWidget { background: @surface; border: none; color: @text; }
 +QTreeWidget::item { padding: 5px 2px; }
-+QTreeWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }
++QTreeWidget::item:hover { background: @surfaceAlt; }
++QTreeWidget::item:selected { background: @accentSoft; color: @accentText; }
++QComboBox {
++    background: @surface; color: @text; border: 1px solid @border;
++    border-radius: 8px; padding: 5px 10px; min-width: 140px;
++}
++QComboBox:hover { background: @surfaceAlt; }
++QComboBox QAbstractItemView {
++    background: @bg; color: @text; border: 1px solid @border;
++    selection-background-color: @accentSoft; selection-color: @accentText;
++}
 +QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
-+QScrollBar::handle:vertical { background: #dcd7d0; border-radius: 4px; min-height: 28px; }
-+QScrollBar::handle:vertical:hover { background: #c8c2b9; }
++QScrollBar::handle:vertical { background: @border; border-radius: 4px; min-height: 28px; }
++QScrollBar::handle:vertical:hover { background: @muted; }
 +QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
 +QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
++
++QToolBar#papernote_toolbar {
++    background: @bg; border: none; padding: 7px 10px; spacing: 2px;
++}
++QToolBar#papernote_toolbar QToolButton {
++    color: @text; background: transparent; border: 1px solid transparent;
++    border-radius: 8px; padding: 5px 9px; font-size: 12.5px;
++}
++QToolBar#papernote_toolbar QToolButton:hover { background: @surface; }
++QToolBar#papernote_toolbar QToolButton:pressed { background: @surfaceAlt; }
++QToolBar#papernote_toolbar QToolButton:disabled { color: @muted; }
++QToolBar#papernote_toolbar QToolButton:checked {
++    background: @accentSoft; border-color: @accent; color: @accentText;
++}
++QToolBar#papernote_toolbar::separator {
++    width: 1px; background: @separator; margin: 6px 8px;
++}
++QToolBar#papernote_toolbar QLineEdit {
++    background: @surface; color: @text; border: 1px solid transparent;
++    border-radius: 8px; padding: 4px 8px; font-size: 12.5px;
++}
++QToolBar#papernote_toolbar QLineEdit:focus { background: @bg; border-color: @accent; }
++
++QToolBar#papernote_tabs_bar {
++    background: @bg; border: none; border-bottom: 1px solid @border;
++    padding: 0px 12px 0px 12px; spacing: 0px;
++}
++QTabBar#papernote_doc_tabs { background: transparent; }
++QTabBar#papernote_doc_tabs::tab {
++    background: transparent; color: @muted; padding: 7px 14px; margin-right: 2px;
++    border: none; border-bottom: 2px solid transparent; max-width: 220px;
++}
++QTabBar#papernote_doc_tabs::tab:selected {
++    color: @text; border-bottom: 2px solid @accent;
++}
++QTabBar#papernote_doc_tabs::tab:hover:!selected { color: @text; }
++QTabBar#papernote_doc_tabs::close-button { margin-left: 6px; }
++
++QDockWidget#papernote_sidebar { background: @surface; border-right: 1px solid @border; }
++QTabWidget#papernote_sidebar_tabs::pane { border: none; background: @surface; }
++QTabWidget#papernote_sidebar_tabs QTabBar::tab {
++    background: transparent; color: @muted; padding: 7px 16px;
++    border-bottom: 2px solid transparent;
++}
++QTabWidget#papernote_sidebar_tabs QTabBar::tab:selected {
++    color: @text; border-bottom: 2px solid @accent;
++}
++QTabWidget#papernote_sidebar_tabs QTabBar::tab:hover:!selected { color: @text; }
++QListWidget#papernote_thumbnails {
++    background: @surface; border: none; color: @muted; font-size: 11.5px;
++}
++QListWidget#papernote_thumbnails::item { padding: 5px; border-radius: 8px; }
++QListWidget#papernote_thumbnails::item:hover { background: @surfaceAlt; }
++QListWidget#papernote_thumbnails::item:selected { background: @accentSoft; color: @accentText; }
 +)QSS");
++
++    qss.replace("@bg", bg().name());
++    qss.replace("@surface", surface().name());
++    qss.replace("@surfaceAlt", surface_alt().name());
++    qss.replace("@border", border().name());
++    qss.replace("@separator", (is_dark() ? QColor(0x3e, 0x3d, 0x38).name() : QColor(0xda, 0xd5, 0xce).name()));
++    qss.replace("@text", text().name());
++    qss.replace("@muted", text_muted().name());
++    qss.replace("@accentSoft", accent_soft().name());
++    qss.replace("@accentText", accent_text().name());
++    qss.replace("@accentHover", accent_hover().name());
++    qss.replace("@accent", accent().name());
++    return qss;
 +}
 +
-+inline void apply_app_theme(QApplication& app) {
-+    QPalette palette = app.palette();
-+    palette.setColor(QPalette::Window, kBg);
-+    palette.setColor(QPalette::WindowText, kText);
-+    palette.setColor(QPalette::Base, QColor(Qt::white));
-+    palette.setColor(QPalette::AlternateBase, kSurface);
-+    palette.setColor(QPalette::Text, kText);
-+    palette.setColor(QPalette::Button, QColor(Qt::white));
-+    palette.setColor(QPalette::ButtonText, kText);
-+    palette.setColor(QPalette::Highlight, kAccent);
-+    palette.setColor(QPalette::HighlightedText, QColor(Qt::white));
-+    palette.setColor(QPalette::ToolTipBase, QColor(Qt::white));
-+    palette.setColor(QPalette::ToolTipText, kText);
-+    app.setPalette(palette);
++inline void apply(QApplication& app, ThemeMode mode) {
++    requested_mode() = mode;
++    dark_active() = (mode == ThemeMode::Dark) || (mode == ThemeMode::System && system_mode() == ThemeMode::Dark);
 +
++    QPalette palette = app.palette();
++    palette.setColor(QPalette::Window, bg());
++    palette.setColor(QPalette::WindowText, text());
++    palette.setColor(QPalette::Base, is_dark() ? surface() : QColor(Qt::white));
++    palette.setColor(QPalette::AlternateBase, surface_alt());
++    palette.setColor(QPalette::Text, text());
++    palette.setColor(QPalette::Button, is_dark() ? surface_alt() : QColor(Qt::white));
++    palette.setColor(QPalette::ButtonText, text());
++    palette.setColor(QPalette::Highlight, accent());
++    palette.setColor(QPalette::HighlightedText, QColor(Qt::white));
++    palette.setColor(QPalette::ToolTipBase, bg());
++    palette.setColor(QPalette::ToolTipText, text());
++    app.setPalette(palette);
 +    app.setStyleSheet(app_stylesheet());
 +}
 +
 +// Small line icons, drawn with QPainter so they stay sharp and need no assets.
-+inline QIcon icon(const QString& name, const QColor& color = kText, int size = 64) {
++inline QIcon icon(const QString& name, const QColor& color, int size = 64) {
 +    QPixmap pixmap(size, size);
 +    pixmap.fill(Qt::transparent);
 +
@@ -1905,6 +2118,21 @@ new file mode 100644
 +        painter.drawEllipse(QPointF(13 * u, 11 * u), 2.2 * u, 2.2 * u);
 +        painter.drawEllipse(QPointF(20 * u, 21 * u), 2.2 * u, 2.2 * u);
 +        painter.setBrush(Qt::NoBrush);
++    }
++    else if (name == "moon") {
++        QPainterPath path;
++        path.addEllipse(QPointF(17 * u, 16 * u), 9 * u, 9 * u);
++        QPainterPath cut;
++        cut.addEllipse(QPointF(22 * u, 12 * u), 8 * u, 8 * u);
++        painter.drawPath(path.subtracted(cut));
++    }
++    else if (name == "sun") {
++        painter.drawEllipse(QPointF(16 * u, 16 * u), 6 * u, 6 * u);
++        for (int i = 0; i < 8; i++) {
++            qreal angle = i * M_PI / 4.0;
++            line(16 + 9 * cos(angle), 16 + 9 * sin(angle),
++                 16 + 12 * cos(angle), 16 + 12 * sin(angle));
++        }
 +    }
 +
 +    painter.end();

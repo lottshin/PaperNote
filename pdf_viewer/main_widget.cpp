@@ -70,6 +70,7 @@
 #include <QTabBar>
 #include <QToolButton>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QVBoxLayout>
 #include <QAction>
 #include <QSignalBlocker>
@@ -1392,6 +1393,7 @@ MainWidget::MainWidget(fz_context* mupdf_context,
     setMenuBar(menu_bar);
     create_main_toolbar();
     create_document_tabbar();
+
 
     menu_bar->stackUnder(text_command_line_edit_container);
 #endif
@@ -6394,9 +6396,9 @@ void MainWidget::show_home_dialog(bool auto_show) {
     layout->setSpacing(10);
 
     QLabel* title = new QLabel("PaperNote", &dialog);
-    title->setStyleSheet("font-size: 28px; font-weight: 600; color: #1f1e1c;");
+    title->setStyleSheet(QString("font-size: 28px; font-weight: 600; color: %1;").arg(papernote::text().name()));
     QLabel* subtitle = new QLabel("继续阅读最近的文档，或打开新的 PDF", &dialog);
-    subtitle->setStyleSheet("color: #6f6a64; font-size: 13px;");
+    subtitle->setStyleSheet(QString("color: %1; font-size: 13px;").arg(papernote::text_muted().name()));
     layout->addWidget(title);
     layout->addSpacing(6);
     layout->addWidget(subtitle);
@@ -6409,7 +6411,7 @@ void MainWidget::show_home_dialog(bool auto_show) {
     list->setUniformItemSizes(true);
     for (const RecentEntry& entry : entries) {
         QListWidgetItem* item = new QListWidgetItem(entry.title, list);
-        item->setIcon(papernote::icon("page", papernote::kTextMuted, 36));
+        item->setIcon(papernote::icon("page", papernote::text_muted(), 36));
         item->setData(Qt::UserRole, entry.path);
         item->setToolTip(entry.path);
         item->setSizeHint(QSize(0, 44));
@@ -11938,11 +11940,6 @@ void MainWidget::create_document_tabbar() {
     document_tabs_bar->setObjectName("papernote_tabs_bar");
     document_tabs_bar->setMovable(false);
     document_tabs_bar->setFloatable(false);
-    document_tabs_bar->setStyleSheet(
-        "QToolBar#papernote_tabs_bar { background: #f7f6f4; border: none;"
-        " border-bottom: 1px solid #e7e3dd; padding: 2px 10px 0 10px; }"
-    );
-
     document_tabs = new QTabBar(document_tabs_bar);
     document_tabs->setExpanding(false);
     document_tabs->setMovable(false);
@@ -12102,16 +12099,16 @@ void MainWidget::show_preferences_dialog() {
     layout->setSpacing(5);
 
     QLabel* title = new QLabel("设置", &dialog);
-    title->setStyleSheet("font-size: 26px; font-weight: 600; color: #1f1e1c;");
+    title->setStyleSheet(QString("font-size: 26px; font-weight: 600; color: %1;").arg(papernote::text().name()));
     QLabel* subtitle = new QLabel("修改会立即保存，对下次启动同样生效", &dialog);
-    subtitle->setStyleSheet("color: #6f6a64; font-size: 12px;");
+    subtitle->setStyleSheet(QString("color: %1; font-size: 12px;").arg(papernote::text_muted().name()));
     layout->addWidget(title);
     layout->addWidget(subtitle);
     layout->addSpacing(8);
 
     auto add_section = [&](const QString& text) {
         QLabel* label = new QLabel(text, &dialog);
-        label->setStyleSheet("color: #6f6a64; font-size: 12px; font-weight: 600; margin-top: 12px;");
+        label->setStyleSheet(QString("color: %1; font-size: 12px; font-weight: 600; margin-top: 12px;").arg(papernote::text_muted().name()));
         layout->addWidget(label);
         layout->addSpacing(3);
     };
@@ -12128,6 +12125,23 @@ void MainWidget::show_preferences_dialog() {
         });
         layout->addWidget(checkbox);
     };
+
+    add_section("外观");
+    {
+        QHBoxLayout* theme_row = new QHBoxLayout();
+        QLabel* theme_label = new QLabel("主题", &dialog);
+        theme_label->setStyleSheet(QString("color: %1; font-size: 13px;").arg(papernote::text().name()));
+        QComboBox* theme_box = new QComboBox(&dialog);
+        theme_box->addItems({"跟随系统", "浅色", "深色"});
+        theme_box->setCurrentIndex((int)papernote::requested_mode());
+        QObject::connect(theme_box, &QComboBox::currentIndexChanged, this, [this](int index) {
+            set_theme_mode(index);
+        });
+        theme_row->addWidget(theme_label);
+        theme_row->addStretch();
+        theme_row->addWidget(theme_box);
+        layout->addLayout(theme_row);
+    }
 
     add_section("阅读");
     add_toggle("高亮按页面位置排序", L"sort_highlights_by_location");
@@ -12160,21 +12174,6 @@ void MainWidget::show_preferences_dialog() {
     dialog.exec();
 }
 
-void MainWidget::update_highlight_swatch_state() {
-    for (size_t i = 0; i < highlight_swatches.size(); i++) {
-        int idx = (int)i * 3;
-        QColor color = QColor::fromRgbF(
-            HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
-        bool selected = (select_highlight_type == (char)('a' + i));
-        highlight_swatches[i]->setStyleSheet(QString(
-            "QToolButton { background: %1; border: %2; border-radius: 10px; }"
-            "QToolButton:hover { border-color: #0075de; }")
-            .arg(color.name())
-            .arg(selected ? QString("2px solid #0075de") : QString("2px solid #ffffff")));
-    }
-    last_highlight_swatch = select_highlight_type;
-}
-
 void MainWidget::goto_page_number(int page_index) {
     if (page_index < 0) {
         return;
@@ -12187,31 +12186,17 @@ void MainWidget::create_sidebar() {
     sidebar->setObjectName("papernote_sidebar");
     sidebar->setFeatures(QDockWidget::NoDockWidgetFeatures);
     sidebar->setAllowedAreas(Qt::LeftDockWidgetArea);
-    sidebar->setMinimumWidth(220);
-    sidebar->setMaximumWidth(320);
+    sidebar->setMinimumWidth(240);
+    sidebar->setMaximumWidth(340);
     sidebar->setTitleBarWidget(new QWidget(sidebar));
-    sidebar->setStyleSheet("QDockWidget { background: #f7f6f4; border-right: 1px solid #e7e3dd; }");
 
     sidebar_tabs = new QTabWidget(sidebar);
     sidebar_tabs->setObjectName("papernote_sidebar_tabs");
     sidebar_tabs->setDocumentMode(true);
-    sidebar_tabs->setStyleSheet(
-        "QTabWidget::pane { border: none; background: #f7f6f4; }"
-        "QTabBar::tab { background: transparent; color: #6f6a64; padding: 7px 16px;"
-        " border-bottom: 2px solid transparent; }"
-        "QTabBar::tab:selected { color: #1f1e1c; border-bottom: 2px solid #0075de; }"
-        "QTabBar::tab:hover:!selected { color: #3c3a36; }"
-    );
 
     toc_tree = new QTreeWidget(sidebar_tabs);
     toc_tree->setObjectName("papernote_toc");
     toc_tree->setHeaderHidden(true);
-    toc_tree->setStyleSheet(
-        "QTreeWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 12.5px; }"
-        "QTreeWidget::item { padding: 5px 2px; }"
-        "QTreeWidget::item:hover { background: #efebe6; }"
-        "QTreeWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
-    );
     QObject::connect(toc_tree, &QTreeWidget::itemClicked, this, [this](QTreeWidgetItem* item, int) {
         int page = item->data(0, Qt::UserRole).toInt();
         if (page >= 0) {
@@ -12222,17 +12207,11 @@ void MainWidget::create_sidebar() {
     thumbnails = new QListWidget(sidebar_tabs);
     thumbnails->setObjectName("papernote_thumbnails");
     thumbnails->setViewMode(QListView::IconMode);
-    thumbnails->setIconSize(QSize(130, 168));
-    thumbnails->setGridSize(QSize(156, 202));
+    thumbnails->setIconSize(QSize(100, 129));
+    thumbnails->setGridSize(QSize(118, 162));
     thumbnails->setResizeMode(QListView::Adjust);
     thumbnails->setMovement(QListView::Static);
-    thumbnails->setSpacing(4);
-    thumbnails->setStyleSheet(
-        "QListWidget { background: #f7f6f4; border: none; color: #3c3a36; font-size: 11.5px; }"
-        "QListWidget::item { padding: 6px; border-radius: 8px; }"
-        "QListWidget::item:hover { background: #efebe6; }"
-        "QListWidget::item:selected { background: #e9f4fd; color: #0b5fa5; }"
-    );
+    thumbnails->setSpacing(2);
     QObject::connect(thumbnails, &QListWidget::itemClicked, this, [this](QListWidgetItem* item) {
         int page = item->data(Qt::UserRole).toInt();
         if (page >= 0) {
@@ -12338,7 +12317,7 @@ void MainWidget::populate_thumbnails() {
     for (int i = 0; i < page_count; i++) {
         QListWidgetItem* item = new QListWidgetItem(QString("第 %1 页").arg(i + 1), thumbnails);
         item->setData(Qt::UserRole, i);
-        item->setSizeHint(QSize(140, 188));
+        item->setSizeHint(QSize(112, 150));
         item->setTextAlignment(Qt::AlignHCenter);
     }
 
@@ -12365,8 +12344,103 @@ void MainWidget::load_next_thumbnail() {
     }
 
     QImage image(pixmap->samples, pixmap->w, pixmap->h, pixmap->stride, QImage::Format_RGB888);
-    QImage scaled = image.scaledToWidth(130, Qt::SmoothTransformation).copy();
+    QImage scaled = image.scaledToWidth(100, Qt::SmoothTransformation).copy();
     thumbnails->item(page)->setIcon(QIcon(QPixmap::fromImage(scaled)));
+}
+
+void MainWidget::update_highlight_swatch_state() {
+    if (!color_button) {
+        return;
+    }
+
+    int idx = (select_highlight_type - 'a') * 3;
+    if (idx < 0 || idx >= 26 * 3) {
+        idx = 0;
+    }
+    QColor color = QColor::fromRgbF(
+        HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
+
+    QPixmap dot(32, 32);
+    dot.fill(Qt::transparent);
+    {
+        QPainter painter(&dot);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setBrush(color);
+        painter.setPen(QPen(papernote::border(), 2));
+        painter.drawEllipse(7, 7, 18, 18);
+    }
+    color_button->setIcon(QIcon(dot));
+
+    for (size_t i = 0; i < color_actions.size(); i++) {
+        color_actions[i]->setChecked(select_highlight_type == (char)('a' + i));
+    }
+    last_highlight_swatch = select_highlight_type;
+}
+
+void MainWidget::apply_theme_to_widgets() {
+    QColor color = papernote::text();
+    for (auto& entry : themed_icon_actions) {
+        entry.first->setIcon(papernote::icon(entry.second, color));
+    }
+    for (auto& entry : themed_tool_buttons) {
+        entry.first->setIcon(papernote::icon(entry.second, color));
+    }
+    if (theme_action) {
+        theme_action->setIcon(papernote::icon(papernote::is_dark() ? "sun" : "moon", color));
+    }
+
+    update_highlight_swatch_state();
+
+    QString status_style = QString("background-color: %1; color: %2; border-top: 1px solid %3;")
+        .arg(papernote::surface().name(), papernote::text_muted().name(), papernote::border().name());
+    if (status_label) {
+        status_label->setStyleSheet(status_style);
+    }
+    if (status_label_left) {
+        status_label_left->setStyleSheet(status_style);
+    }
+    if (status_label_right) {
+        status_label_right->setStyleSheet(status_style);
+    }
+    if (text_command_line_edit_container) {
+        text_command_line_edit_container->setStyleSheet(status_style);
+    }
+
+    if (sidebar && sidebar->isVisible()) {
+        sidebar_doc_path.clear();
+        refresh_sidebar();
+    }
+}
+
+void MainWidget::set_theme_mode(int mode) {
+    papernote::ThemeMode theme_mode = papernote::ThemeMode::System;
+    if (mode == 1) {
+        theme_mode = papernote::ThemeMode::Light;
+    }
+    else if (mode == 2) {
+        theme_mode = papernote::ThemeMode::Dark;
+    }
+
+    papernote::apply(*qApp, theme_mode);
+
+    QSettings settings("PaperNote", "PaperNote");
+    settings.setValue("ui_theme", mode == 0 ? "system" : (mode == 1 ? "light" : "dark"));
+
+    config_manager->deserialize_config("dark_mode_background_color", L"0.098 0.098 0.094");
+
+    if (papernote::is_dark()) {
+        set_dark_mode();
+    }
+    else {
+        set_light_mode();
+    }
+    invalidate_render();
+
+    apply_theme_to_widgets();
+}
+
+void MainWidget::toggle_theme() {
+    set_theme_mode(papernote::is_dark() ? 1 : 2);
 }
 
 void MainWidget::create_main_toolbar() {
@@ -12374,103 +12448,82 @@ void MainWidget::create_main_toolbar() {
     main_toolbar->setObjectName("papernote_toolbar");
     main_toolbar->setMovable(false);
     main_toolbar->setFloatable(false);
+    main_toolbar->setIconSize(QSize(18, 18));
     main_toolbar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    main_toolbar->setIconSize(QSize(19, 19));
-    main_toolbar->setStyleSheet(
-        "QToolBar#papernote_toolbar { background: #ffffff; border: none;"
-        " border-bottom: 1px solid #e7e3dd; padding: 6px 10px; spacing: 2px; }"
-        "QToolBar#papernote_toolbar QToolButton { color: #3c3a36; background: transparent;"
-        " border: 1px solid transparent; border-radius: 8px; padding: 5px 10px; font-size: 12.5px; }"
-        "QToolBar#papernote_toolbar QToolButton:disabled { color: #b9b4ad; }"
-        "QToolBar#papernote_toolbar QToolButton:hover { background: #f5f3f0; }"
-        "QToolBar#papernote_toolbar QToolButton:pressed { background: #efebe6; }"
-        "QToolBar#papernote_toolbar QToolButton:checked {"
-        " background: #e9f4fd; border-color: #bbddf7; color: #0b5fa5; }"
-        "QToolBar#papernote_toolbar::separator { width: 1px; background: #eae6e0; margin: 6px 9px; }"
-        "QLineEdit { background: #ffffff; color: #1f1e1c; border: 1px solid #e7e3dd;"
-        " border-radius: 8px; padding: 4px 8px; font-size: 12.5px; }"
-        "QLineEdit:focus { background: #ffffff; border-color: #0075de; }"
-    );
 
     auto add_button = [this](const QString& icon_name, const QString& text, const QString& tooltip,
-                             std::function<void()> fn) {
-        QAction* action = main_toolbar->addAction(papernote::icon(icon_name), " " + text);
+                             std::function<void()> fn, bool show_text) {
+        QAction* action = main_toolbar->addAction(
+            papernote::icon(icon_name, papernote::text()), show_text ? text : QString());
         action->setToolTip(tooltip);
+        themed_icon_actions.push_back({action, icon_name});
         connect(action, &QAction::triggered, this, [fn](bool) { fn(); });
         return action;
     };
 
-    add_button("open", "打开 PDF", "打开一个 PDF 文件（也可以把文件直接拖进窗口）", [this]() {
-        run_ui_command("open_document");
-    });
-
-    add_button("recent", "最近", "从最近阅读的文档里继续", [this]() {
-        show_home_dialog();
-    });
+    add_button("open", "打开", "打开 PDF（也可以把文件直接拖进窗口）",
+               [this]() { run_ui_command("open_document"); }, true);
+    add_button("recent", "最近", "从最近阅读的文档继续",
+               [this]() { show_home_dialog(); }, true);
 
     main_toolbar->addSeparator();
 
-    add_button("prev", "上一页", "上一页（也可以按 PageUp 或 Shift+空格）", [this]() {
-        run_ui_command("previous_page");
-    });
+    add_button("prev", "上一页", "上一页（PageUp / Shift+空格）",
+               [this]() { run_ui_command("previous_page"); }, false);
 
     page_number_edit = new QLineEdit(main_toolbar);
-    page_number_edit->setFixedWidth(92);
-    page_number_edit->setFixedHeight(30);
+    page_number_edit->setFixedWidth(84);
+    page_number_edit->setFixedHeight(28);
     page_number_edit->setAlignment(Qt::AlignCenter);
-    page_number_edit->setToolTip("输入页码后回车即可跳转");
+    page_number_edit->setToolTip("输入页码后回车跳转");
     page_number_edit->setClearButtonEnabled(false);
     main_toolbar->addWidget(page_number_edit);
     connect(page_number_edit, &QLineEdit::returnPressed, this, &MainWidget::goto_page_from_edit);
 
-    add_button("next", "下一页", "下一页（也可以按 PageDown 或空格）", [this]() {
-        run_ui_command("next_page");
-    });
+    add_button("next", "下一页", "下一页（PageDown / 空格）",
+               [this]() { run_ui_command("next_page"); }, false);
 
     main_toolbar->addSeparator();
 
-    add_button("zoom_out", "缩小", "缩小", [this]() {
-        run_ui_command("zoom_out");
-    });
-    add_button("zoom_in", "放大", "放大", [this]() {
-        run_ui_command("zoom_in");
-    });
-    add_button("fit", "适应宽度", "让页面宽度适应窗口", [this]() {
-        run_ui_command("fit_to_page_width");
-    });
+    add_button("zoom_out", "缩小", "缩小", [this]() { run_ui_command("zoom_out"); }, false);
+    add_button("zoom_in", "放大", "放大", [this]() { run_ui_command("zoom_in"); }, false);
+    add_button("fit", "适应宽度", "让页面宽度适应窗口",
+               [this]() { run_ui_command("fit_to_page_width"); }, false);
 
     main_toolbar->addSeparator();
 
-    QAction* sidebar_toggle = add_button("sidebar", "侧栏", "显示/隐藏目录与页面缩略图（F4）", [this]() {
-        toggle_sidebar();
-    });
-    sidebar_toggle->setCheckable(true);
-    sidebar_action = sidebar_toggle;
-
-    main_toolbar->addSeparator();
-
-    QAction* highlight_action = add_button("highlight", "高亮模式", "开启后，用鼠标选中文字就会自动加高亮；再点一次关闭", [this]() {
-        is_select_highlight_mode = !is_select_highlight_mode;
-        set_status_message(is_select_highlight_mode
-            ? L"高亮模式：已开启，选中文字即可高亮（点工具栏按钮关闭）"
-            : L"高亮模式：已关闭");
-    });
+    QAction* highlight_action = add_button("highlight", "高亮模式",
+        "高亮模式：选中文字即可高亮，再点一次关闭", [this]() {
+            is_select_highlight_mode = !is_select_highlight_mode;
+            set_status_message(is_select_highlight_mode
+                ? L"高亮模式：已开启，选中文字即可高亮"
+                : L"高亮模式：已关闭");
+        }, false);
     highlight_action->setCheckable(true);
     select_highlight_action = highlight_action;
 
-    // Three quick colour swatches (a/b/c) from the user's highlight palette.
+    // Single "current highlight colour" chip with a small palette menu.
+    color_button = new QToolButton(main_toolbar);
+    color_button->setFixedSize(26, 26);
+    color_button->setPopupMode(QToolButton::InstantPopup);
+    color_button->setToolTip("高亮颜色（点开选择颜色）");
+    QMenu* color_menu = new QMenu(color_button);
     for (char letter = 'a'; letter <= 'c'; letter++) {
         int idx = (letter - 'a') * 3;
         QColor swatch_color = QColor::fromRgbF(
             HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
-        QToolButton* swatch = new QToolButton(main_toolbar);
-        swatch->setFixedSize(20, 20);
-        swatch->setCursor(Qt::PointingHandCursor);
-        swatch->setToolTip(QString("用这个颜色高亮（%1）").arg(QChar(letter)));
-        swatch->setStyleSheet(QString(
-            "QToolButton { background: %1; border: 2px solid #1e1d26; border-radius: 10px; }"
-            "QToolButton:hover { border-color: #ffffff; }").arg(swatch_color.name()));
-        connect(swatch, &QToolButton::clicked, this, [this, letter]() {
+        QPixmap dot(32, 32);
+        dot.fill(Qt::transparent);
+        {
+            QPainter painter(&dot);
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            painter.setBrush(swatch_color);
+            painter.setPen(QPen(papernote::border(), 2));
+            painter.drawEllipse(7, 7, 18, 18);
+        }
+        QAction* action = color_menu->addAction(QIcon(dot), QString("颜色 %1").arg(QChar(letter)));
+        action->setCheckable(true);
+        connect(action, &QAction::triggered, this, [this, letter]() {
             select_highlight_type = letter;
             is_select_highlight_mode = true;
             if (select_highlight_action) {
@@ -12480,26 +12533,25 @@ void MainWidget::create_main_toolbar() {
             update_highlight_swatch_state();
             set_status_message(QString("高亮颜色：%1，选中文字即可高亮").arg(QChar(letter)).toStdWString());
         });
-        highlight_swatches.push_back(swatch);
-        main_toolbar->addWidget(swatch);
+        color_actions.push_back(action);
     }
+    color_button->setMenu(color_menu);
+    main_toolbar->addWidget(color_button);
 
-    add_button("bookmark", "加书签", "给当前页添加书签", [this]() {
-        run_ui_command("add_bookmark");
-    });
+    add_button("bookmark", "加书签", "给当前页添加书签",
+               [this]() { run_ui_command("add_bookmark"); }, false);
+    add_button("export", "导出笔记", "把高亮和书签导出为 Markdown",
+               [this]() { run_ui_command("export_highlights"); }, false);
 
-    add_button("export", "导出笔记", "把所有高亮和书签导出为 Markdown 笔记", [this]() {
-        run_ui_command("export_highlights");
-    });
-
-    main_toolbar->addSeparator();
-
-    main_toolbar->addSeparator();
+    // Flexible space: keep primary actions left, utilities right (modern app bar).
+    QWidget* toolbar_spacer = new QWidget(main_toolbar);
+    toolbar_spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    main_toolbar->addWidget(toolbar_spacer);
 
     search_edit = new QLineEdit(main_toolbar);
-    search_edit->setPlaceholderText("搜索文档内容…");
+    search_edit->setPlaceholderText("搜索文档…");
     search_edit->setFixedWidth(180);
-    search_edit->setFixedHeight(30);
+    search_edit->setFixedHeight(28);
     search_edit->setClearButtonEnabled(true);
     main_toolbar->addWidget(search_edit);
     connect(search_edit, &QLineEdit::returnPressed, this, [this]() {
@@ -12517,31 +12569,38 @@ void MainWidget::create_main_toolbar() {
     auto add_result_button = [this](const QString& icon_name, const QString& tooltip,
                                     const std::string& command) {
         QToolButton* button = new QToolButton(main_toolbar);
-        button->setIcon(papernote::icon(icon_name));
-        button->setIconSize(QSize(17, 17));
-        button->setFixedSize(26, 26);
+        button->setIcon(papernote::icon(icon_name, papernote::text()));
+        button->setIconSize(QSize(16, 16));
+        button->setFixedSize(24, 24);
         button->setAutoRaise(true);
         button->setToolTip(tooltip);
-        button->setStyleSheet(
-            "QToolButton { border: 1px solid transparent; border-radius: 6px; }"
-            "QToolButton:hover { background: #f5f3f0; }");
+        themed_tool_buttons.push_back({button, icon_name});
         connect(button, &QToolButton::clicked, this, [this, command]() {
             run_ui_command(command);
         });
         main_toolbar->addWidget(button);
     };
-
     add_result_button("prev", "上一个搜索结果（N）", "previous_item");
     add_result_button("next", "下一个搜索结果（n）", "next_item");
 
     main_toolbar->addSeparator();
 
-    add_button("help", "帮助", "查看快速上手说明", [this]() {
-        show_quickstart_dialog();
-    });
+    QAction* sidebar_toggle = add_button("sidebar", "侧栏", "显示/隐藏目录与页面缩略图（F4）",
+                                         [this]() { toggle_sidebar(); }, false);
+    sidebar_toggle->setCheckable(true);
+    sidebar_action = sidebar_toggle;
+
+    theme_action = add_button("moon", "主题", "切换浅色 / 深色主题",
+                              [this]() { toggle_theme(); }, false);
+    add_button("help", "帮助", "快速上手（F2）",
+               [this]() { show_quickstart_dialog(); }, false);
 
     addToolBar(Qt::TopToolBarArea, main_toolbar);
-    update_highlight_swatch_state();
+    apply_theme_to_widgets();
+
+    if (papernote::is_dark()) {
+        set_dark_mode();
+    }
 }
 
 QMenuBar* MainWidget::create_main_menu_bar(){
