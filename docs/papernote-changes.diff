@@ -1,7 +1,7 @@
 diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 --- a/pdf_viewer/input.cpp
 +++ b/pdf_viewer/input.cpp
-@@ -2671,6 +2671,17 @@
+@@ -2671,7 +2671,31 @@
      std::vector<char> special_symbols() {
          std::vector<char> res = { '_', };
          return res;
@@ -16,29 +16,54 @@ diff --git a/pdf_viewer/input.cpp b/pdf_viewer/input.cpp
 +
 +    void perform() {
 +        result = widget->handle_export_highlights();
++    }
++};
++
++class QuickstartCommand : public Command {
++public:
++    static inline const std::string cname = "help";
++    static inline const std::string hname = "Show the PaperNote quick start guide";
++    QuickstartCommand(MainWidget* w) : Command(cname, w) {};
++
++    void perform() {
++        widget->show_quickstart_dialog();
      }
++
++    bool requires_document() { return false; }
  };
  
-@@ -7290,6 +7301,7 @@
+ class CommandPaletteCommand : public Command {
+@@ -7290,6 +7314,8 @@
      register_command<CopyScreenshotToScratchpad>();
      register_command<CopyScreenshotToClipboard>();
      register_command<AddHighlightCommand>();
 +    register_command<ExportHighlightsCommand>();
++    register_command<QuickstartCommand>();
      register_command<GotoTableOfContentsCommand>();
      register_command<GotoHighlightCommand>();
      register_command<IncreaseFreetextBookmarkFontSizeCommand>();
 diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 --- a/pdf_viewer/main_widget.cpp
 +++ b/pdf_viewer/main_widget.cpp
-@@ -14,6 +14,7 @@
+@@ -14,6 +14,8 @@
  
  
  #include "coordinates.h"
++#include "ui_translation.h"
 +#include <algorithm>
  #include <iostream>
  #include <vector>
  #include <string>
-@@ -2111,7 +2112,7 @@
+@@ -56,6 +58,8 @@
+ #include <qguiapplication.h>
+ #include <qmimedata.h>
+ #include <qscreen.h>
++#include <QMessageBox>
++#include <QSettings>
+ #include <QGestureEvent>
+ #include <qjsonarray.h>
+ #include <qjsonobject.h>
+@@ -2111,7 +2115,7 @@
      if (has_document) {
          //setWindowTitle(QString::fromStdWString(path.get_path()));
          if (file_name.size() > 0) {
@@ -47,7 +72,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          }
          else {
              setWindowTitle(QString::fromStdWString(path));
-@@ -6147,7 +6148,111 @@
+@@ -6147,7 +6151,120 @@
          return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
      }
  }
@@ -68,7 +93,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        QString text;
 +        QString note;
 +    };
- 
++
 +    std::vector<NoteEntry> entries;
 +
 +    for (const Highlight& highlight : document->get_highlights()) {
@@ -87,7 +112,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        entry.text = QString::fromStdWString(bookmark.description).trimmed();
 +        entries.push_back(entry);
 +    }
-+
+ 
 +    if (entries.empty()) {
 +        set_status_message(L"当前文档没有高亮或书签，无需导出");
 +        return L"";
@@ -156,33 +181,108 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    return export_path.toStdWString();
 +}
 +
++void MainWidget::show_quickstart_dialog() {
++    QMessageBox message_box(this);
++    message_box.setWindowTitle("PaperNote 快速上手");
++    message_box.setTextFormat(Qt::RichText);
++    message_box.setText(papernote_quickstart_html());
++    message_box.setStandardButtons(QMessageBox::Ok);
++    message_box.exec();
++}
++
  void MainWidget::change_selected_highlight_type(char new_type) {
      if (selected_highlight_index != -1) {
          doc()->update_highlight_type(selected_highlight_index, new_type);
+@@ -11547,7 +11664,7 @@
+             key_mappings = command_key_mappings[command];
+         }
+ 
+-        QString action_menu_name = QString::fromStdString(human_readable_name);
++        QString action_menu_name = papernote_tr_command(command, QString::fromStdString(human_readable_name));
+ 
+         if (key_mappings.size() > 0){
+             action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
+@@ -11567,7 +11684,7 @@
+ 
+     }
+     else {
+-        auto menu = parent->addMenu(items->name);
++        auto menu = parent->addMenu(papernote_tr_menu(items->name));
+         for (auto&& child : items->children) {
+             create_menu_from_menu_node(menu, child, command_key_mappings);
+         }
+@@ -11809,19 +11926,37 @@
+     auto command_key_mappings = input_handler->get_command_key_mappings();
+     QMenuBar* menu_bar = new QMenuBar(this);
+     for (auto top_level_menu : top_level_menus) {
+-        auto parent_menu = menu_bar->addMenu(top_level_menu->name);
++        auto parent_menu = menu_bar->addMenu(papernote_tr_menu(top_level_menu->name));
+         for (auto child : top_level_menu->children) {
+             create_menu_from_menu_node(parent_menu, child, command_key_mappings);
+         }
+     }
+ 
+-    QMenu* help_menu = menu_bar->addMenu("Help");
+-    QAction* donate_action = help_menu->addAction("Donate");
+-    //donate_action->setShortcut(QKeySequence(Qt::Key_Meta | Qt::Key_PageDown));
++    QMenu* help_menu = menu_bar->addMenu(papernote_tr_menu("Help"));
+ 
++    QAction* quickstart_action = help_menu->addAction("快速上手（F2）");
++    connect(quickstart_action, &QAction::triggered, [&](){
++        show_quickstart_dialog();
++    });
+ 
+-    connect(donate_action, &QAction::triggered, [&](){
+-        execute_macro_if_enabled(L"donate");
++    QAction* about_action = help_menu->addAction("关于 PaperNote");
++    connect(about_action, &QAction::triggered, [&](){
++        QMessageBox::about(this, "关于 PaperNote",
++            "<h3>PaperNote 1.0.0</h3>"
++            "<p>面向学生的 PDF 阅读器，基于开源项目 "
++            "<a href='https://github.com/ahrm/sioyek'>Sioyek</a> 二次开发（GPLv3）。</p>"
++            "<p>在 Sioyek 基础上新增：高亮/书签导出 Markdown（Ctrl+Shift+E）、"
++            "中文菜单与快速上手引导、全新图标与品牌名。</p>"
++            "<p>源码：<a href='https://github.com/lottshin/PaperNote'>github.com/lottshin/PaperNote</a></p>");
++    });
++
++    // Show the Chinese quick start once, on the very first launch.
++    QTimer::singleShot(1200, this, [this](){
++        QSettings settings("PaperNote", "PaperNote");
++        if (!settings.value("quickstart_shown", false).toBool()) {
++            settings.setValue("quickstart_shown", true);
++            show_quickstart_dialog();
++        }
+     });
+ 
+     for (auto top_level_menu : top_level_menus) {
 diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 --- a/pdf_viewer/main_widget.h
 +++ b/pdf_viewer/main_widget.h
-@@ -660,6 +660,7 @@
+@@ -660,6 +660,8 @@
      void handle_show_marks();
      void handle_goto_bookmark_global();
      std::wstring handle_add_highlight(char symbol);
 +    std::wstring handle_export_highlights();
++    void show_quickstart_dialog();
      void handle_goto_highlight();
      void handle_goto_highlight_global();
      void handle_goto_toc();
 diff --git a/pdf_viewer/keys.config b/pdf_viewer/keys.config
 --- a/pdf_viewer/keys.config
 +++ b/pdf_viewer/keys.config
-@@ -185,6 +185,9 @@
+@@ -184,6 +184,12 @@
+ goto_highlight_g gH
  # Left click on a highlight and then press the `delete_highlight` shortcut to delete it.
  delete_highlight dh
- 
++
 +# Export all highlights and bookmarks of the current document to <document>.notes.md (fork addition)
 +export_highlights <C-E>
 +
++# Show PaperNote's Chinese quick start guide (fork addition)
++help <f2>
+ 
  # Sets the highlight type to be used for other operations (the default highlight type is 'a')
  #set_select_highlight_type
- 
 diff --git a/pdf_viewer_build_config.pro b/pdf_viewer_build_config.pro
 --- a/pdf_viewer_build_config.pro
 +++ b/pdf_viewer_build_config.pro
@@ -220,3 +320,203 @@ diff --git a/resources/Info.plist b/resources/Info.plist
  	<key>CFBundlePackageType</key>
  	<string>APPL</string>
  	<key>CFBundleSignature</key>
+diff --git a/pdf_viewer/ui_translation.h b/pdf_viewer/ui_translation.h
+new file mode 100644
+--- /dev/null
++++ b/pdf_viewer/ui_translation.h
+@@ -0,0 +1,195 @@
++#pragma once
++
++// Chinese (zh-CN) UI strings for the PaperNote fork.
++//
++// Sioyek has no translation layer of its own: menu titles and command labels are
++// compiled-in English. Rather than rewriting every string in the app, this header
++// provides a compact lookup used by the menu bar (the part of the UI a new user
++// actually looks at) and the Chinese quick-start dialog.
++//
++// Unknown strings fall back to the original English text, so the app keeps
++// working even if a new upstream command is added.
++
++#include <QString>
++#include <string>
++#include <unordered_map>
++
++inline QString papernote_tr_menu(const QString& english) {
++    static const std::unordered_map<QString, QString> map = {
++        {"File", "文件"},
++        {"Window", "窗口"},
++        {"View", "视图"},
++        {"Navigate", "导航"},
++        {"Annotations", "注释"},
++        {"Highlights", "高亮"},
++        {"Bookmarks", "书签"},
++        {"Marks", "标记"},
++        {"Portals", "门户"},
++        {"Overview", "预览"},
++        {"Drawings", "手绘"},
++        {"Tools", "工具"},
++        {"Preferences", "偏好设置"},
++        {"Help", "帮助"},
++        {"Scratchpad", "草稿板"},
++        {"Ruler", "标尺"},
++    };
++
++    auto it = map.find(english);
++    return it == map.end() ? english : it->second;
++}
++
++inline QString papernote_tr_command(const std::string& command, const QString& fallback) {
++    static const std::unordered_map<std::string, QString> map = {
++        // File / 文件
++        {"open_document", "打开文档…"},
++        {"open_prev_doc", "打开上一个文档"},
++        {"open_document_embedded", "打开嵌入的文档…"},
++        {"open_document_embedded_from_current_path", "从当前目录打开嵌入文档…"},
++        {"open_last_document", "打开上次阅读的文档"},
++        {"goto_tab", "切换到标签页…"},
++        {"download_clipboard_url", "下载剪贴板里的链接…"},
++        {"rename", "重命名文档…"},
++
++        // Window / 窗口
++        {"new_window", "新建窗口"},
++        {"close_window", "关闭窗口"},
++        {"goto_window", "切换到窗口…"},
++        {"maximize", "最大化"},
++        {"toggle_fullscreen", "全屏切换"},
++        {"toggle_two_page_mode", "双页模式"},
++        {"toggle_window_configuration", "切换窗口布局"},
++
++        // View / 视图
++        {"zoom_in", "放大"},
++        {"zoom_out", "缩小"},
++        {"fit_to_page_width", "适应页宽"},
++        {"fit_to_page_width_smart", "智能适应页宽"},
++        {"fit_to_page_height", "适应页高"},
++        {"fit_to_page_height_smart", "智能适应页高"},
++        {"toggle_dark_mode", "深色模式"},
++        {"toggle_custom_color", "自定义配色"},
++        {"toggle_statusbar", "显示/隐藏状态栏"},
++        {"toggle_scrollbar", "显示/隐藏滚动条"},
++        {"toggle_horizontal_scroll_lock", "锁定水平滚动"},
++        {"toggle_presentation_mode", "演示模式"},
++        {"toggle_visual_scroll", "视觉滚动"},
++        {"toggle_pdf_annotations", "显示 PDF 注释"},
++        {"toggleconfig_preserve_image_colors_in_dark_mode", "深色模式保留图片原色"},
++
++        // Navigate / 导航
++        {"goto_beginning", "跳到开头"},
++        {"goto_end", "跳到结尾"},
++        {"goto_toc", "目录…"},
++        {"goto_page_with_page_number", "跳到页码…"},
++        {"goto_page_with_label", "跳到标签页…"},
++        {"next_page", "下一页"},
++        {"previous_page", "上一页"},
++        {"screen_down", "向下翻屏"},
++        {"screen_up", "向上翻屏"},
++        {"next_state", "前进"},
++        {"prev_state", "后退"},
++        {"goto_definition", "跳转到定义"},
++        {"overview_definition", "预览定义"},
++        {"portal_to_definition", "从定义处跳转"},
++        {"goto_highlight", "跳转到高亮…"},
++        {"goto_highlight_g", "全局跳转到高亮…"},
++        {"goto_bookmark", "跳转到书签…"},
++        {"goto_bookmark_g", "全局跳转到书签…"},
++        {"goto_mark", "跳转到标记…"},
++        {"set_mark", "设置标记…"},
++        {"goto_portal_list", "门户列表…"},
++        {"portal", "创建门户"},
++        {"next_item", "下一个条目"},
++        {"previous_item", "上一个条目"},
++        {"move_visual_mark_up", "向上移动"},
++        {"move_visual_mark_down", "向下移动"},
++        {"search", "搜索…"},
++        {"regex_search", "正则搜索…"},
++        {"goto_tab", "切换到标签页…"},
++
++        // Annotations / 注释
++        {"add_highlight", "添加高亮"},
++        {"add_highlight_with_current_type", "用当前类型高亮"},
++        {"add_bookmark", "添加书签"},
++        {"add_freetext_bookmark", "添加文字书签…"},
++        {"add_marked_bookmark", "添加带标记的书签"},
++        {"delete_highlight", "删除高亮"},
++        {"delete_visible_annotation", "删除可见注释"},
++        {"edit_visible_annotation", "编辑可见注释…"},
++        {"add_annot_to_selected_highlight", "给高亮加批注…"},
++        {"delete_portal", "删除门户"},
++        {"delete_freehand_drawings", "删除手绘"},
++        {"create_visible_portal", "创建可见门户"},
++        {"embed_annotations", "把注释嵌入 PDF…"},
++        {"import_annotations", "从文件导入注释…"},
++        {"download_overview_paper", "下载预览中的论文…"},
++
++        // Overview / 预览
++        {"move_left_in_overview", "预览中左移"},
++        {"move_right_in_overview", "预览中右移"},
++        {"next_overview", "下一个预览"},
++        {"previous_overview", "上一个预览"},
++        {"zoom_in_overview", "预览放大"},
++        {"zoom_out_overview", "预览缩小"},
++        {"overview_next_item", "预览下一项"},
++        {"overview_prev_item", "预览上一项"},
++        {"close_overview", "关闭预览"},
++
++        // Drawings / 手绘
++        {"toggle_freehand_drawing_mode", "手绘模式"},
++        {"set_freehand_type", "选择手绘类型…"},
++        {"set_freehand_thickness", "设置手绘粗细…"},
++        {"toggle_drawing_mask", "绘图遮罩"},
++
++        // Tools / 工具
++        {"command", "命令列表…"},
++        {"command_palette", "命令面板…"},
++        {"toggle_reading", "朗读"},
++        {"setconfig_tts_rate", "设置朗读速度…"},
++        {"toggle_synctex", "SyncTeX 跳转"},
++        {"toggle_scratchpad_mode", "草稿板模式"},
++        {"save_scratchpad", "保存草稿板…"},
++        {"load_scratchpad", "加载草稿板…"},
++        {"copy_screenshot_to_scratchpad", "截图到草稿板"},
++        {"clear_scratchpad", "清空草稿板"},
++
++        // Preferences / 偏好设置
++        {"prefs_user", "用户偏好设置…"},
++        {"keys_user", "用户键位设置…"},
++        {"prefs_user_all", "全部用户偏好设置…"},
++        {"keys_user_all", "全部用户键位设置…"},
++        {"keys", "默认键位说明…"},
++        {"prefs", "默认偏好说明…"},
++    };
++
++    auto it = map.find(command);
++    return it == map.end() ? fallback : it->second;
++}
++
++// Chinese quick-start shown on first launch and from Help > 快速上手 (F1).
++inline QString papernote_quickstart_html() {
++    return QString(
++        "<h3>PaperNote 快速上手</h3>"
++        "<p>PaperNote 是键盘驱动的 PDF 阅读器：<b>没有工具栏</b>，所有操作都在菜单和键盘上。"
++        "下面是最常用的快捷键。</p>"
++        "<table cellpadding='4'>"
++        "<tr><td><b>打开文档</b></td><td><code>o</code></td>"
++        "    <td><b>搜索</b></td><td><code>/</code> 或 <code>Ctrl+F</code>，<code>n</code>/<code>N</code> 跳转</td></tr>"
++        "<tr><td><b>目录</b></td><td><code>t</code></td>"
++        "    <td><b>翻页</b></td><td><code>空格</code>/<code>Shift+空格</code>，<code>j</code>/<code>k</code> 连续滚动</td></tr>"
++        "<tr><td><b>跳页</b></td><td><code>Ctrl+PageDown</code></td>"
++        "    <td><b>全屏</b></td><td><code>F11</code></td></tr>"
++        "<tr><td><b>高亮</b></td><td>先选中文字，再按 <code>h</code> + 字母（a/b/c 是三种颜色）</td>"
++        "    <td><b>书签</b></td><td><code>b</code></td></tr>"
++        "<tr><td><b>跳到高亮</b></td><td><code>g h</code></td>"
++        "    <td><b>跳到书签</b></td><td><code>g b</code></td></tr>"
++        "<tr><td><b>导出笔记</b></td><td><code>Ctrl+Shift+E</code>（生成同目录 .notes.md）</td>"
++        "    <td><b>命令面板</b></td><td><code>:</code>（可搜索所有命令）</td></tr>"
++        "<tr><td><b>缩放</b></td><td><code>+</code>/<code>-</code>，<code>=</code> 适应页宽</td>"
++        "    <td><b>本帮助</b></td><td><code>F2</code></td></tr>"
++        "</table>"
++        "<p>菜单栏里也有同样的功能（已汉化）。高亮和书签会自动保存，"
++        "按 <code>Ctrl+Shift+E</code> 就能把它们导出成 Markdown 笔记。</p>"
++        "<p style='color:#888'>PaperNote 1.0.0 · 基于开源项目 Sioyek（GPLv3）二次开发</p>"
++    );
++}

@@ -2685,6 +2685,19 @@ public:
     }
 };
 
+class QuickstartCommand : public Command {
+public:
+    static inline const std::string cname = "help";
+    static inline const std::string hname = "Show the PaperNote quick start guide";
+    QuickstartCommand(MainWidget* w) : Command(cname, w) {};
+
+    void perform() {
+        widget->show_quickstart_dialog();
+    }
+
+    bool requires_document() { return false; }
+};
+
 class CommandPaletteCommand : public Command {
 public:
     static inline const std::string cname = "command_palette";
@@ -7302,6 +7315,7 @@ CommandManager::CommandManager(ConfigManager* config_manager) {
     register_command<CopyScreenshotToClipboard>();
     register_command<AddHighlightCommand>();
     register_command<ExportHighlightsCommand>();
+    register_command<QuickstartCommand>();
     register_command<GotoTableOfContentsCommand>();
     register_command<GotoHighlightCommand>();
     register_command<IncreaseFreetextBookmarkFontSizeCommand>();

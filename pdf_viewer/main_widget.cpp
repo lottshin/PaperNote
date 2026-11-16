@@ -14,6 +14,7 @@
 
 
 #include "coordinates.h"
+#include "ui_translation.h"
 #include <algorithm>
 #include <iostream>
 #include <vector>
@@ -57,6 +58,8 @@
 #include <qguiapplication.h>
 #include <qmimedata.h>
 #include <qscreen.h>
+#include <QMessageBox>
+#include <QSettings>
 #include <QGestureEvent>
 #include <qjsonarray.h>
 #include <qjsonobject.h>
@@ -6253,6 +6256,15 @@ std::wstring MainWidget::handle_export_highlights() {
     return export_path.toStdWString();
 }
 
+void MainWidget::show_quickstart_dialog() {
+    QMessageBox message_box(this);
+    message_box.setWindowTitle("PaperNote 快速上手");
+    message_box.setTextFormat(Qt::RichText);
+    message_box.setText(papernote_quickstart_html());
+    message_box.setStandardButtons(QMessageBox::Ok);
+    message_box.exec();
+}
+
 void MainWidget::change_selected_highlight_type(char new_type) {
     if (selected_highlight_index != -1) {
         doc()->update_highlight_type(selected_highlight_index, new_type);
@@ -11652,7 +11664,7 @@ void MainWidget::create_menu_from_menu_node(
             key_mappings = command_key_mappings[command];
         }
 
-        QString action_menu_name = QString::fromStdString(human_readable_name);
+        QString action_menu_name = papernote_tr_command(command, QString::fromStdString(human_readable_name));
 
         if (key_mappings.size() > 0){
             action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
@@ -11672,7 +11684,7 @@ void MainWidget::create_menu_from_menu_node(
 
     }
     else {
-        auto menu = parent->addMenu(items->name);
+        auto menu = parent->addMenu(papernote_tr_menu(items->name));
         for (auto&& child : items->children) {
             create_menu_from_menu_node(menu, child, command_key_mappings);
         }
@@ -11914,19 +11926,37 @@ QMenuBar* MainWidget::create_main_menu_bar(){
     auto command_key_mappings = input_handler->get_command_key_mappings();
     QMenuBar* menu_bar = new QMenuBar(this);
     for (auto top_level_menu : top_level_menus) {
-        auto parent_menu = menu_bar->addMenu(top_level_menu->name);
+        auto parent_menu = menu_bar->addMenu(papernote_tr_menu(top_level_menu->name));
         for (auto child : top_level_menu->children) {
             create_menu_from_menu_node(parent_menu, child, command_key_mappings);
         }
     }
 
-    QMenu* help_menu = menu_bar->addMenu("Help");
-    QAction* donate_action = help_menu->addAction("Donate");
-    //donate_action->setShortcut(QKeySequence(Qt::Key_Meta | Qt::Key_PageDown));
+    QMenu* help_menu = menu_bar->addMenu(papernote_tr_menu("Help"));
 
+    QAction* quickstart_action = help_menu->addAction("快速上手（F2）");
+    connect(quickstart_action, &QAction::triggered, [&](){
+        show_quickstart_dialog();
+    });
 
-    connect(donate_action, &QAction::triggered, [&](){
-        execute_macro_if_enabled(L"donate");
+    QAction* about_action = help_menu->addAction("关于 PaperNote");
+    connect(about_action, &QAction::triggered, [&](){
+        QMessageBox::about(this, "关于 PaperNote",
+            "<h3>PaperNote 1.0.0</h3>"
+            "<p>面向学生的 PDF 阅读器，基于开源项目 "
+            "<a href='https://github.com/ahrm/sioyek'>Sioyek</a> 二次开发（GPLv3）。</p>"
+            "<p>在 Sioyek 基础上新增：高亮/书签导出 Markdown（Ctrl+Shift+E）、"
+            "中文菜单与快速上手引导、全新图标与品牌名。</p>"
+            "<p>源码：<a href='https://github.com/lottshin/PaperNote'>github.com/lottshin/PaperNote</a></p>");
+    });
+
+    // Show the Chinese quick start once, on the very first launch.
+    QTimer::singleShot(1200, this, [this](){
+        QSettings settings("PaperNote", "PaperNote");
+        if (!settings.value("quickstart_shown", false).toBool()) {
+            settings.setValue("quickstart_shown", true);
+            show_quickstart_dialog();
+        }
     });
 
     for (auto top_level_menu : top_level_menus) {

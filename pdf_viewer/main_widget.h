@@ -661,6 +661,7 @@ public:
     void handle_goto_bookmark_global();
     std::wstring handle_add_highlight(char symbol);
     std::wstring handle_export_highlights();
+    void show_quickstart_dialog();
     void handle_goto_highlight();
     void handle_goto_highlight_global();
     void handle_goto_toc();

@@ -14,6 +14,8 @@ note system.
 | `MainWidget::handle_export_highlights()` — writes `<document>.notes.md` next to the PDF | `pdf_viewer/main_widget.{h,cpp}` |
 | App name / bundle id / icon | `resources/Info.plist`, `resources/papernote.{icns,ico}`, `pdf_viewer_build_config.pro` |
 | Window title shows the fork name | `pdf_viewer/main_widget.cpp` |
+| Chinese menu bar (~80 command labels) | `pdf_viewer/ui_translation.h` |
+| Chinese quick-start dialog on first launch + `F2` | `pdf_viewer/main_widget.cpp`, `pdf_viewer/input.cpp` |
 | macOS DMG build script | `scripts/build_macos_dmg.sh` |
 | Windows installer (Inno Setup) + CI workflow | `installer/windows/papernote.iss`, `.github/workflows/build-installers.yml` |
 
