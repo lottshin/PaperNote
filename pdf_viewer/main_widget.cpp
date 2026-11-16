@@ -60,6 +60,12 @@
 #include <qscreen.h>
 #include <QMessageBox>
 #include <QSettings>
+#include <QToolBar>
+#include <QAction>
+#include <QSignalBlocker>
+#include <QDesktopServices>
+#include <QUrl>
+#include <functional>
 #include <QGestureEvent>
 #include <qjsonarray.h>
 #include <qjsonobject.h>
@@ -1373,6 +1379,8 @@ MainWidget::MainWidget(fz_context* mupdf_context,
     }
     menu_bar = create_main_menu_bar();
     setMenuBar(menu_bar);
+    create_main_toolbar();
+
     menu_bar->stackUnder(text_command_line_edit_container);
 #endif
 
@@ -1887,6 +1895,24 @@ void MainWidget::validate_render() {
 void MainWidget::validate_ui() {
     status_label_left->setText(QString::fromStdWString(get_status_string(false)));
     status_label_right->setText(QString::fromStdWString(get_status_string(true)));
+
+    if (select_highlight_action) {
+        QSignalBlocker blocker(select_highlight_action);
+        select_highlight_action->setChecked(is_select_highlight_mode);
+    }
+
+    if (page_number_edit) {
+        if (main_document_view_has_document() && doc()) {
+            if (!page_number_edit->hasFocus()) {
+                int page = doc()->get_offset_page_number(main_document_view->get_offset_y());
+                page_number_edit->setText(QString("%1 / %2").arg(page + 1).arg(doc()->num_pages()));
+            }
+        }
+        else if (!page_number_edit->hasFocus()) {
+            page_number_edit->setText(QString());
+        }
+    }
+
     update_command_hints_position();
     is_ui_invalidated = false;
 }
@@ -6253,6 +6279,26 @@ std::wstring MainWidget::handle_export_highlights() {
                         .arg(export_path)
                         .toStdWString());
 
+    // Make the result actionable for mouse-first users. The env var keeps
+    // scripted/CLI usage non-blocking.
+    if (qEnvironmentVariableIsEmpty("PAPERNOTE_NO_UI")) {
+        QMessageBox message_box(this);
+        message_box.setWindowTitle("导出完成");
+        message_box.setText(QString("已导出 %1 条标注到：\n%2").arg(entries.size()).arg(export_path));
+
+        QPushButton* open_file_button = message_box.addButton("打开笔记", QMessageBox::AcceptRole);
+        QPushButton* open_folder_button = message_box.addButton("打开所在文件夹", QMessageBox::ActionRole);
+        message_box.addButton("关闭", QMessageBox::RejectRole);
+        message_box.exec();
+
+        if (message_box.clickedButton() == open_file_button) {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(export_path));
+        }
+        else if (message_box.clickedButton() == open_folder_button) {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(document_info.dir().absolutePath()));
+        }
+    }
+
     return export_path.toStdWString();
 }
 
@@ -6261,8 +6307,17 @@ void MainWidget::show_quickstart_dialog() {
     message_box.setWindowTitle("PaperNote 快速上手");
     message_box.setTextFormat(Qt::RichText);
     message_box.setText(papernote_quickstart_html());
-    message_box.setStandardButtons(QMessageBox::Ok);
+
+    QPushButton* open_document_button = nullptr;
+    if (!main_document_view_has_document()) {
+        open_document_button = message_box.addButton("打开 PDF", QMessageBox::AcceptRole);
+    }
+    message_box.addButton("知道了", QMessageBox::RejectRole);
     message_box.exec();
+
+    if (open_document_button && message_box.clickedButton() == open_document_button) {
+        run_ui_command("open_document");
+    }
 }
 
 void MainWidget::change_selected_highlight_type(char new_type) {
@@ -11689,6 +11744,119 @@ void MainWidget::create_menu_from_menu_node(
             create_menu_from_menu_node(menu, child, command_key_mappings);
         }
     }
+}
+
+void MainWidget::run_ui_command(const std::string& command) {
+    auto cmd = command_manager->get_command_with_name(this, command);
+    if (cmd) {
+        handle_command_types(std::move(cmd), 0);
+    }
+}
+
+void MainWidget::goto_page_from_edit() {
+    if (!page_number_edit) {
+        return;
+    }
+
+    QString text = page_number_edit->text();
+    QString page_text = text.section('/', 0, 0).trimmed();
+    bool ok = false;
+    int page = page_text.toInt(&ok);
+    if (ok && page > 0) {
+        execute_command(L"goto_page_with_page_number", std::to_wstring(page), false);
+    }
+
+    page_number_edit->clearFocus();
+}
+
+void MainWidget::create_main_toolbar() {
+    main_toolbar = new QToolBar("工具栏", this);
+    main_toolbar->setObjectName("papernote_toolbar");
+    main_toolbar->setMovable(false);
+    main_toolbar->setFloatable(false);
+    main_toolbar->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    main_toolbar->setStyleSheet(
+        "QToolBar { background: #23222a; border: none; padding: 4px 8px; spacing: 4px; }"
+        "QToolButton { color: #e8e8ee; background: transparent; border: 1px solid transparent;"
+        " border-radius: 6px; padding: 5px 10px; font-size: 13px; }"
+        "QToolButton:hover { background: #34323d; border-color: #4a4757; }"
+        "QToolButton:pressed { background: #2a2833; }"
+        "QToolButton:checked { background: #5b4a83; border-color: #8a72c0; }"
+        "QLineEdit { background: #17161c; color: #e8e8ee; border: 1px solid #3a3846;"
+        " border-radius: 6px; padding: 4px 6px; font-size: 13px; }"
+    );
+
+    auto add_button = [this](const QString& text, const QString& tooltip, std::function<void()> fn) {
+        QAction* action = main_toolbar->addAction(text);
+        action->setToolTip(tooltip);
+        connect(action, &QAction::triggered, this, [fn](bool) { fn(); });
+        return action;
+    };
+
+    add_button("打开 PDF", "打开一个 PDF 文件（也可以把文件直接拖进窗口）", [this]() {
+        run_ui_command("open_document");
+    });
+
+    main_toolbar->addSeparator();
+
+    add_button("◀ 上一页", "上一页（也可以按 PageUp 或 Shift+空格）", [this]() {
+        run_ui_command("previous_page");
+    });
+
+    page_number_edit = new QLineEdit(main_toolbar);
+    page_number_edit->setFixedWidth(88);
+    page_number_edit->setAlignment(Qt::AlignCenter);
+    page_number_edit->setToolTip("输入页码后回车即可跳转");
+    page_number_edit->setClearButtonEnabled(false);
+    main_toolbar->addWidget(page_number_edit);
+    connect(page_number_edit, &QLineEdit::returnPressed, this, &MainWidget::goto_page_from_edit);
+
+    add_button("下一页 ▶", "下一页（也可以按 PageDown 或空格）", [this]() {
+        run_ui_command("next_page");
+    });
+
+    main_toolbar->addSeparator();
+
+    add_button("－", "缩小", [this]() {
+        run_ui_command("zoom_out");
+    });
+    add_button("＋", "放大", [this]() {
+        run_ui_command("zoom_in");
+    });
+    add_button("适应宽度", "让页面宽度适应窗口", [this]() {
+        run_ui_command("fit_to_page_width");
+    });
+
+    main_toolbar->addSeparator();
+
+    QAction* highlight_action = add_button("高亮模式", "开启后，用鼠标选中文字就会自动加高亮；再点一次关闭", [this]() {
+        is_select_highlight_mode = !is_select_highlight_mode;
+        set_status_message(is_select_highlight_mode
+            ? L"高亮模式：已开启，选中文字即可高亮（点工具栏按钮关闭）"
+            : L"高亮模式：已关闭");
+    });
+    highlight_action->setCheckable(true);
+    select_highlight_action = highlight_action;
+
+    add_button("加书签", "给当前页添加书签", [this]() {
+        run_ui_command("add_bookmark");
+    });
+
+    add_button("导出笔记", "把所有高亮和书签导出为 Markdown 笔记", [this]() {
+        run_ui_command("export_highlights");
+    });
+
+    main_toolbar->addSeparator();
+
+    add_button("搜索", "搜索文档内容", [this]() {
+        run_ui_command("search");
+    });
+
+    add_button("帮助", "查看快速上手说明", [this]() {
+        show_quickstart_dialog();
+    });
+
+    addToolBar(Qt::TopToolBarArea, main_toolbar);
 }
 
 QMenuBar* MainWidget::create_main_menu_bar(){

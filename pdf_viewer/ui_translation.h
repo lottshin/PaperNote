@@ -170,7 +170,7 @@ inline QString papernote_tr_command(const std::string& command, const QString& f
 inline QString papernote_quickstart_html() {
     return QString(
         "<h3>PaperNote 快速上手</h3>"
-        "<p>PaperNote 是键盘驱动的 PDF 阅读器：<b>没有工具栏</b>，所有操作都在菜单和键盘上。"
+        "<p>PaperNote 同时支持<b>鼠标</b>和<b>键盘</b>：顶部工具栏可以直接点，键盘快捷键更高效。"
         "下面是最常用的快捷键。</p>"
         "<table cellpadding='4'>"
         "<tr><td><b>打开文档</b></td><td><code>o</code></td>"

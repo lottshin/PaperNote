@@ -26,6 +26,8 @@ extern float HORIZONTAL_MOVE_AMOUNT;
 class SelectionIndicator;
 class QLocalSocket;
 class QLineEdit;
+class QToolBar;
+class QAction;
 class QTextEdit;
 class QTimer;
 class QDragEvent;
@@ -360,6 +362,11 @@ public:
     QLabel* status_label_left = nullptr;
     QLabel* status_label_right = nullptr;
     QWidget* status_label = nullptr;
+
+    // PaperNote toolbar for mouse-first users
+    QToolBar* main_toolbar = nullptr;
+    QLineEdit* page_number_edit = nullptr;
+    QAction* select_highlight_action = nullptr;
     int text_suggestion_index = 0;
 
     int last_pause_rest_of_document_page = -1;
@@ -662,6 +669,9 @@ public:
     std::wstring handle_add_highlight(char symbol);
     std::wstring handle_export_highlights();
     void show_quickstart_dialog();
+    void create_main_toolbar();
+    void run_ui_command(const std::string& command);
+    void goto_page_from_edit();
     void handle_goto_highlight();
     void handle_goto_highlight_global();
     void handle_goto_toc();

@@ -16,6 +16,7 @@ note system.
 | Window title shows the fork name | `pdf_viewer/main_widget.cpp` |
 | Chinese menu bar (~80 command labels) | `pdf_viewer/ui_translation.h` |
 | Chinese quick-start dialog on first launch + `F2` | `pdf_viewer/main_widget.cpp`, `pdf_viewer/input.cpp` |
+| Mouse-first toolbar (open / page nav / zoom / highlight mode / export) | `pdf_viewer/main_widget.cpp` |
 | macOS DMG build script | `scripts/build_macos_dmg.sh` |
 | Windows installer (Inno Setup) + CI workflow | `installer/windows/papernote.iss`, `.github/workflows/build-installers.yml` |
 
