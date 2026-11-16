@@ -65,6 +65,7 @@
 #include <QDialog>
 #include <QListWidget>
 #include <QTabBar>
+#include <QToolButton>
 #include <QCheckBox>
 #include <QVBoxLayout>
 #include <QAction>
@@ -146,6 +147,7 @@ extern float TEXT_SELECTION_MINIMUM_DISTANCE;
 extern float VISUAL_MARK_NEXT_PAGE_FRACTION;
 extern float VISUAL_MARK_NEXT_PAGE_THRESHOLD;
 extern float SMALL_PIXMAP_SCALE;
+extern float HIGHLIGHT_COLORS[26 * 3];
 extern std::wstring EXECUTE_COMMANDS[26];
 extern float HIGHLIGHT_COLORS[26 * 3];
 extern int STATUS_BAR_FONT_SIZE;
@@ -1921,6 +1923,10 @@ void MainWidget::validate_ui() {
     }
 
     refresh_document_tabbar();
+
+    if (last_highlight_swatch != select_highlight_type) {
+        update_highlight_swatch_state();
+    }
 
     update_command_hints_position();
     is_ui_invalidated = false;
@@ -11961,6 +11967,66 @@ void MainWidget::create_document_tabbar() {
         handle_goto_tab(path.toStdWString());
     });
 
+    document_tabs->setContextMenuPolicy(Qt::CustomContextMenu);
+    QObject::connect(document_tabs, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        int index = document_tabs->tabAt(pos);
+        if (index < 0) {
+            return;
+        }
+
+        QString path = document_tabs->tabData(index).toString();
+        QMenu menu(this);
+        QAction* close_this = menu.addAction("关闭此标签");
+        QAction* close_others = menu.addAction("关闭其他标签");
+        menu.addSeparator();
+        QAction* reveal = menu.addAction("在文件管理器中显示");
+
+        QAction* chosen = menu.exec(document_tabs->mapToGlobal(pos));
+        if (!chosen) {
+            return;
+        }
+
+        auto switch_away_if_current_closed = [this]() {
+            std::vector<std::wstring> remaining = document_manager->get_tabs();
+            QString current_path = doc() ? QString::fromStdWString(doc()->get_path()) : QString();
+            bool current_alive = false;
+            for (const std::wstring& p : remaining) {
+                if (QString::fromStdWString(p) == current_path) {
+                    current_alive = true;
+                    break;
+                }
+            }
+            if (!current_alive && !remaining.empty()) {
+                handle_goto_tab(remaining[0]);
+            }
+            refresh_document_tabbar();
+        };
+
+        if (chosen == close_this) {
+            document_manager->remove_tab(path.toStdWString());
+            switch_away_if_current_closed();
+        }
+        else if (chosen == close_others) {
+            std::vector<std::wstring> tabs = document_manager->get_tabs();
+            for (const std::wstring& p : tabs) {
+                if (QString::fromStdWString(p) != path) {
+                    document_manager->remove_tab(p);
+                }
+            }
+            handle_goto_tab(path.toStdWString());
+            refresh_document_tabbar();
+        }
+        else if (chosen == reveal) {
+#ifdef Q_OS_MAC
+            QProcess::startDetached("open", {"-R", path});
+#elif defined(Q_OS_WIN)
+            QProcess::startDetached("explorer", {"/select,", QDir::toNativeSeparators(path)});
+#else
+            QProcess::startDetached("xdg-open", {QFileInfo(path).absolutePath()});
+#endif
+        }
+    });
+
     QObject::connect(document_tabs, &QTabBar::tabCloseRequested, this, [this](int index) {
         if (index < 0 || index >= document_tabs->count()) {
             return;
@@ -12083,6 +12149,21 @@ void MainWidget::show_preferences_dialog() {
     dialog.exec();
 }
 
+void MainWidget::update_highlight_swatch_state() {
+    for (size_t i = 0; i < highlight_swatches.size(); i++) {
+        int idx = (int)i * 3;
+        QColor color = QColor::fromRgbF(
+            HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
+        bool selected = (select_highlight_type == (char)('a' + i));
+        highlight_swatches[i]->setStyleSheet(QString(
+            "QToolButton { background: %1; border: %2; border-radius: 10px; }"
+            "QToolButton:hover { border-color: #ffffff; }")
+            .arg(color.name())
+            .arg(selected ? QString("2px solid #ffffff") : QString("2px solid #1e1d26")));
+    }
+    last_highlight_swatch = select_highlight_type;
+}
+
 void MainWidget::create_main_toolbar() {
     main_toolbar = new QToolBar("工具栏", this);
     main_toolbar->setObjectName("papernote_toolbar");
@@ -12163,6 +12244,32 @@ void MainWidget::create_main_toolbar() {
     highlight_action->setCheckable(true);
     select_highlight_action = highlight_action;
 
+    // Three quick colour swatches (a/b/c) from the user's highlight palette.
+    for (char letter = 'a'; letter <= 'c'; letter++) {
+        int idx = (letter - 'a') * 3;
+        QColor swatch_color = QColor::fromRgbF(
+            HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
+        QToolButton* swatch = new QToolButton(main_toolbar);
+        swatch->setFixedSize(20, 20);
+        swatch->setCursor(Qt::PointingHandCursor);
+        swatch->setToolTip(QString("用这个颜色高亮（%1）").arg(QChar(letter)));
+        swatch->setStyleSheet(QString(
+            "QToolButton { background: %1; border: 2px solid #1e1d26; border-radius: 10px; }"
+            "QToolButton:hover { border-color: #ffffff; }").arg(swatch_color.name()));
+        connect(swatch, &QToolButton::clicked, this, [this, letter]() {
+            select_highlight_type = letter;
+            is_select_highlight_mode = true;
+            if (select_highlight_action) {
+                QSignalBlocker blocker(select_highlight_action);
+                select_highlight_action->setChecked(true);
+            }
+            update_highlight_swatch_state();
+            set_status_message(QString("高亮颜色：%1，选中文字即可高亮").arg(QChar(letter)).toStdWString());
+        });
+        highlight_swatches.push_back(swatch);
+        main_toolbar->addWidget(swatch);
+    }
+
     add_button("bookmark", "加书签", "给当前页添加书签", [this]() {
         run_ui_command("add_bookmark");
     });
@@ -12173,15 +12280,54 @@ void MainWidget::create_main_toolbar() {
 
     main_toolbar->addSeparator();
 
-    add_button("search", "搜索", "搜索文档内容", [this]() {
-        run_ui_command("search");
+    main_toolbar->addSeparator();
+
+    search_edit = new QLineEdit(main_toolbar);
+    search_edit->setPlaceholderText("搜索文档内容…");
+    search_edit->setFixedWidth(180);
+    search_edit->setFixedHeight(30);
+    search_edit->setClearButtonEnabled(true);
+    main_toolbar->addWidget(search_edit);
+    connect(search_edit, &QLineEdit::returnPressed, this, [this]() {
+        if (!search_edit) {
+            return;
+        }
+        QString text = search_edit->text().trimmed();
+        if (text.isEmpty() || !main_document_view_has_document()) {
+            return;
+        }
+        execute_command(L"search", text.toStdWString(), false);
+        search_edit->clearFocus();
     });
+
+    auto add_result_button = [this](const QString& icon_name, const QString& tooltip,
+                                    const std::string& command) {
+        QToolButton* button = new QToolButton(main_toolbar);
+        button->setIcon(papernote::icon(icon_name));
+        button->setIconSize(QSize(17, 17));
+        button->setFixedSize(26, 26);
+        button->setAutoRaise(true);
+        button->setToolTip(tooltip);
+        button->setStyleSheet(
+            "QToolButton { border: 1px solid transparent; border-radius: 6px; }"
+            "QToolButton:hover { background: #2c2a36; border-color: #3f3c4e; }");
+        connect(button, &QToolButton::clicked, this, [this, command]() {
+            run_ui_command(command);
+        });
+        main_toolbar->addWidget(button);
+    };
+
+    add_result_button("prev", "上一个搜索结果（N）", "previous_item");
+    add_result_button("next", "下一个搜索结果（n）", "next_item");
+
+    main_toolbar->addSeparator();
 
     add_button("help", "帮助", "查看快速上手说明", [this]() {
         show_quickstart_dialog();
     });
 
     addToolBar(Qt::TopToolBarArea, main_toolbar);
+    update_highlight_swatch_state();
 }
 
 QMenuBar* MainWidget::create_main_menu_bar(){

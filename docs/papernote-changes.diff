@@ -165,7 +165,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <iostream>
  #include <vector>
  #include <string>
-@@ -56,6 +59,19 @@
+@@ -56,6 +59,20 @@
  #include <qguiapplication.h>
  #include <qmimedata.h>
  #include <qscreen.h>
@@ -175,6 +175,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +#include <QDialog>
 +#include <QListWidget>
 +#include <QTabBar>
++#include <QToolButton>
 +#include <QCheckBox>
 +#include <QVBoxLayout>
 +#include <QAction>
@@ -185,7 +186,15 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  #include <QGestureEvent>
  #include <qjsonarray.h>
  #include <qjsonobject.h>
-@@ -1369,6 +1385,9 @@
+@@ -130,6 +147,7 @@
+ extern float VISUAL_MARK_NEXT_PAGE_FRACTION;
+ extern float VISUAL_MARK_NEXT_PAGE_THRESHOLD;
+ extern float SMALL_PIXMAP_SCALE;
++extern float HIGHLIGHT_COLORS[26 * 3];
+ extern std::wstring EXECUTE_COMMANDS[26];
+ extern float HIGHLIGHT_COLORS[26 * 3];
+ extern int STATUS_BAR_FONT_SIZE;
+@@ -1369,6 +1387,9 @@
      }
      menu_bar = create_main_menu_bar();
      setMenuBar(menu_bar);
@@ -195,7 +204,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
      menu_bar->stackUnder(text_command_line_edit_container);
  #endif
  
-@@ -1883,6 +1902,26 @@
+@@ -1883,6 +1904,30 @@
  void MainWidget::validate_ui() {
      status_label_left->setText(QString::fromStdWString(get_status_string(false)));
      status_label_right->setText(QString::fromStdWString(get_status_string(true)));
@@ -219,10 +228,14 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +
 +    refresh_document_tabbar();
 +
++    if (last_highlight_swatch != select_highlight_type) {
++        update_highlight_swatch_state();
++    }
++
      update_command_hints_position();
      is_ui_invalidated = false;
  }
-@@ -2089,8 +2128,20 @@
+@@ -2089,8 +2134,20 @@
  
      main_document_view->on_view_size_change(main_window_width, main_window_height);
      main_document_view->open_document(path, &this->is_render_invalidated);
@@ -245,7 +258,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          return;
      }
      adjust_two_page_mode_document_zoom_and_offset(doc()->get_path());
-@@ -2111,7 +2162,7 @@
+@@ -2111,7 +2168,7 @@
      if (has_document) {
          //setWindowTitle(QString::fromStdWString(path.get_path()));
          if (file_name.size() > 0) {
@@ -254,7 +267,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          }
          else {
              setWindowTitle(QString::fromStdWString(path));
-@@ -6145,9 +6196,272 @@
+@@ -6145,9 +6202,272 @@
      else {
          change_selected_highlight_type(symbol);
          return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
@@ -300,7 +313,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    if (entries.empty()) {
 +        set_status_message(L"当前文档没有高亮或书签，无需导出");
 +        return L"";
-+    }
+     }
 +
 +    std::stable_sort(entries.begin(), entries.end(), [](const NoteEntry& lhs, const NoteEntry& rhs) {
 +        if (lhs.page != rhs.page) {
@@ -380,7 +393,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        else if (message_box.clickedButton() == open_folder_button) {
 +            QDesktopServices::openUrl(QUrl::fromLocalFile(document_info.dir().absolutePath()));
 +        }
-     }
++    }
 +
 +    return export_path.toStdWString();
  }
@@ -527,7 +540,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  void MainWidget::change_selected_highlight_type(char new_type) {
      if (selected_highlight_index != -1) {
          doc()->update_highlight_type(selected_highlight_index, new_type);
-@@ -7554,7 +7868,13 @@
+@@ -7554,7 +7874,13 @@
              std::unique_ptr<Command> subcommand = std::get<std::unique_ptr<Command>>(std::move(subitem));
              std::string command_name = subcommand->get_human_readable_name();
  
@@ -542,7 +555,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              actions.push_back(action);
              connect(action, &QAction::triggered, [&, command_name, subcommand = std::move(subcommand)]() mutable {
                  //execute_macro_if_enabled(command_name.toStdWString());
-@@ -11547,7 +11867,7 @@
+@@ -11547,7 +11873,7 @@
              key_mappings = command_key_mappings[command];
          }
  
@@ -551,7 +564,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  
          if (key_mappings.size() > 0){
              action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
-@@ -11567,19 +11887,310 @@
+@@ -11567,19 +11893,450 @@
  
      }
      else {
@@ -560,16 +573,16 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          for (auto&& child : items->children) {
              create_menu_from_menu_node(menu, child, command_key_mappings);
          }
-     }
++    }
 +}
 +
 +void MainWidget::run_ui_command(const std::string& command) {
 +    auto cmd = command_manager->get_command_with_name(this, command);
 +    if (cmd) {
 +        handle_command_types(std::move(cmd), 0);
-+    }
-+}
-+
+     }
+ }
+ 
 +void MainWidget::goto_page_from_edit() {
 +    if (!page_number_edit) {
 +        return;
@@ -628,6 +641,66 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            return;
 +        }
 +        handle_goto_tab(path.toStdWString());
++    });
++
++    document_tabs->setContextMenuPolicy(Qt::CustomContextMenu);
++    QObject::connect(document_tabs, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
++        int index = document_tabs->tabAt(pos);
++        if (index < 0) {
++            return;
++        }
++
++        QString path = document_tabs->tabData(index).toString();
++        QMenu menu(this);
++        QAction* close_this = menu.addAction("关闭此标签");
++        QAction* close_others = menu.addAction("关闭其他标签");
++        menu.addSeparator();
++        QAction* reveal = menu.addAction("在文件管理器中显示");
++
++        QAction* chosen = menu.exec(document_tabs->mapToGlobal(pos));
++        if (!chosen) {
++            return;
++        }
++
++        auto switch_away_if_current_closed = [this]() {
++            std::vector<std::wstring> remaining = document_manager->get_tabs();
++            QString current_path = doc() ? QString::fromStdWString(doc()->get_path()) : QString();
++            bool current_alive = false;
++            for (const std::wstring& p : remaining) {
++                if (QString::fromStdWString(p) == current_path) {
++                    current_alive = true;
++                    break;
++                }
++            }
++            if (!current_alive && !remaining.empty()) {
++                handle_goto_tab(remaining[0]);
++            }
++            refresh_document_tabbar();
++        };
++
++        if (chosen == close_this) {
++            document_manager->remove_tab(path.toStdWString());
++            switch_away_if_current_closed();
++        }
++        else if (chosen == close_others) {
++            std::vector<std::wstring> tabs = document_manager->get_tabs();
++            for (const std::wstring& p : tabs) {
++                if (QString::fromStdWString(p) != path) {
++                    document_manager->remove_tab(p);
++                }
++            }
++            handle_goto_tab(path.toStdWString());
++            refresh_document_tabbar();
++        }
++        else if (chosen == reveal) {
++#ifdef Q_OS_MAC
++            QProcess::startDetached("open", {"-R", path});
++#elif defined(Q_OS_WIN)
++            QProcess::startDetached("explorer", {"/select,", QDir::toNativeSeparators(path)});
++#else
++            QProcess::startDetached("xdg-open", {QFileInfo(path).absolutePath()});
++#endif
++        }
 +    });
 +
 +    QObject::connect(document_tabs, &QTabBar::tabCloseRequested, this, [this](int index) {
@@ -750,8 +823,23 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    QObject::connect(close_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(0); });
 +
 +    dialog.exec();
- }
- 
++}
++
++void MainWidget::update_highlight_swatch_state() {
++    for (size_t i = 0; i < highlight_swatches.size(); i++) {
++        int idx = (int)i * 3;
++        QColor color = QColor::fromRgbF(
++            HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
++        bool selected = (select_highlight_type == (char)('a' + i));
++        highlight_swatches[i]->setStyleSheet(QString(
++            "QToolButton { background: %1; border: %2; border-radius: 10px; }"
++            "QToolButton:hover { border-color: #ffffff; }")
++            .arg(color.name())
++            .arg(selected ? QString("2px solid #ffffff") : QString("2px solid #1e1d26")));
++    }
++    last_highlight_swatch = select_highlight_type;
++}
++
 +void MainWidget::create_main_toolbar() {
 +    main_toolbar = new QToolBar("工具栏", this);
 +    main_toolbar->setObjectName("papernote_toolbar");
@@ -832,6 +920,32 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    highlight_action->setCheckable(true);
 +    select_highlight_action = highlight_action;
 +
++    // Three quick colour swatches (a/b/c) from the user's highlight palette.
++    for (char letter = 'a'; letter <= 'c'; letter++) {
++        int idx = (letter - 'a') * 3;
++        QColor swatch_color = QColor::fromRgbF(
++            HIGHLIGHT_COLORS[idx], HIGHLIGHT_COLORS[idx + 1], HIGHLIGHT_COLORS[idx + 2]);
++        QToolButton* swatch = new QToolButton(main_toolbar);
++        swatch->setFixedSize(20, 20);
++        swatch->setCursor(Qt::PointingHandCursor);
++        swatch->setToolTip(QString("用这个颜色高亮（%1）").arg(QChar(letter)));
++        swatch->setStyleSheet(QString(
++            "QToolButton { background: %1; border: 2px solid #1e1d26; border-radius: 10px; }"
++            "QToolButton:hover { border-color: #ffffff; }").arg(swatch_color.name()));
++        connect(swatch, &QToolButton::clicked, this, [this, letter]() {
++            select_highlight_type = letter;
++            is_select_highlight_mode = true;
++            if (select_highlight_action) {
++                QSignalBlocker blocker(select_highlight_action);
++                select_highlight_action->setChecked(true);
++            }
++            update_highlight_swatch_state();
++            set_status_message(QString("高亮颜色：%1，选中文字即可高亮").arg(QChar(letter)).toStdWString());
++        });
++        highlight_swatches.push_back(swatch);
++        main_toolbar->addWidget(swatch);
++    }
++
 +    add_button("bookmark", "加书签", "给当前页添加书签", [this]() {
 +        run_ui_command("add_bookmark");
 +    });
@@ -842,15 +956,54 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +
 +    main_toolbar->addSeparator();
 +
-+    add_button("search", "搜索", "搜索文档内容", [this]() {
-+        run_ui_command("search");
++    main_toolbar->addSeparator();
++
++    search_edit = new QLineEdit(main_toolbar);
++    search_edit->setPlaceholderText("搜索文档内容…");
++    search_edit->setFixedWidth(180);
++    search_edit->setFixedHeight(30);
++    search_edit->setClearButtonEnabled(true);
++    main_toolbar->addWidget(search_edit);
++    connect(search_edit, &QLineEdit::returnPressed, this, [this]() {
++        if (!search_edit) {
++            return;
++        }
++        QString text = search_edit->text().trimmed();
++        if (text.isEmpty() || !main_document_view_has_document()) {
++            return;
++        }
++        execute_command(L"search", text.toStdWString(), false);
++        search_edit->clearFocus();
 +    });
++
++    auto add_result_button = [this](const QString& icon_name, const QString& tooltip,
++                                    const std::string& command) {
++        QToolButton* button = new QToolButton(main_toolbar);
++        button->setIcon(papernote::icon(icon_name));
++        button->setIconSize(QSize(17, 17));
++        button->setFixedSize(26, 26);
++        button->setAutoRaise(true);
++        button->setToolTip(tooltip);
++        button->setStyleSheet(
++            "QToolButton { border: 1px solid transparent; border-radius: 6px; }"
++            "QToolButton:hover { background: #2c2a36; border-color: #3f3c4e; }");
++        connect(button, &QToolButton::clicked, this, [this, command]() {
++            run_ui_command(command);
++        });
++        main_toolbar->addWidget(button);
++    };
++
++    add_result_button("prev", "上一个搜索结果（N）", "previous_item");
++    add_result_button("next", "下一个搜索结果（n）", "next_item");
++
++    main_toolbar->addSeparator();
 +
 +    add_button("help", "帮助", "查看快速上手说明", [this]() {
 +        show_quickstart_dialog();
 +    });
 +
 +    addToolBar(Qt::TopToolBarArea, main_toolbar);
++    update_highlight_swatch_state();
 +}
 +
  QMenuBar* MainWidget::create_main_menu_bar(){
@@ -863,7 +1016,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              new MenuNode{ "open_document", "", {}},
              new MenuNode { "open_prev_doc", "", {}},
              new MenuNode { "open_document_embedded", "", {}},
-@@ -11809,21 +12420,39 @@
+@@ -11809,19 +12566,37 @@
      auto command_key_mappings = input_handler->get_command_key_mappings();
      QMenuBar* menu_bar = new QMenuBar(this);
      for (auto top_level_menu : top_level_menus) {
@@ -895,8 +1048,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            "<p>在 Sioyek 基础上新增：高亮/书签导出 Markdown（Ctrl+Shift+E）、"
 +            "中文菜单与快速上手引导、全新图标与品牌名。</p>"
 +            "<p>源码：<a href='https://github.com/lottshin/PaperNote'>github.com/lottshin/PaperNote</a></p>");
-     });
- 
++    });
++
 +    // Show the Chinese quick start once, on the very first launch.
 +    QTimer::singleShot(1200, this, [this](){
 +        QSettings settings("PaperNote", "PaperNote");
@@ -904,25 +1057,24 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            settings.setValue("quickstart_shown", true);
 +            show_quickstart_dialog();
 +        }
-+    });
-+
+     });
+ 
      for (auto top_level_menu : top_level_menus) {
-         delete_menu_nodes(top_level_menu);
-     }
 diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 --- a/pdf_viewer/main_widget.h
 +++ b/pdf_viewer/main_widget.h
-@@ -26,6 +26,9 @@
+@@ -26,6 +26,10 @@
  class SelectionIndicator;
  class QLocalSocket;
  class QLineEdit;
 +class QToolBar;
 +class QAction;
 +class QTabBar;
++class QToolButton;
  class QTextEdit;
  class QTimer;
  class QDragEvent;
-@@ -360,6 +363,15 @@
+@@ -360,6 +364,18 @@
      QLabel* status_label_left = nullptr;
      QLabel* status_label_right = nullptr;
      QWidget* status_label = nullptr;
@@ -930,6 +1082,9 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    // PaperNote toolbar for mouse-first users
 +    QToolBar* main_toolbar = nullptr;
 +    QLineEdit* page_number_edit = nullptr;
++    QLineEdit* search_edit = nullptr;
++    std::vector<QToolButton*> highlight_swatches;
++    char last_highlight_swatch = 0;
 +    QAction* select_highlight_action = nullptr;
 +
 +    // PaperNote document tabs
@@ -938,7 +1093,7 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
      int text_suggestion_index = 0;
  
      int last_pause_rest_of_document_page = -1;
-@@ -660,6 +672,15 @@
+@@ -660,6 +676,16 @@
      void handle_show_marks();
      void handle_goto_bookmark_global();
      std::wstring handle_add_highlight(char symbol);
@@ -949,6 +1104,7 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 +    void create_document_tabbar();
 +    void refresh_document_tabbar();
 +    void show_preferences_dialog();
++    void update_highlight_swatch_state();
 +    void run_ui_command(const std::string& command);
 +    void goto_page_from_edit();
      void handle_goto_highlight();

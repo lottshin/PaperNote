@@ -29,6 +29,7 @@ class QLineEdit;
 class QToolBar;
 class QAction;
 class QTabBar;
+class QToolButton;
 class QTextEdit;
 class QTimer;
 class QDragEvent;
@@ -367,6 +368,9 @@ public:
     // PaperNote toolbar for mouse-first users
     QToolBar* main_toolbar = nullptr;
     QLineEdit* page_number_edit = nullptr;
+    QLineEdit* search_edit = nullptr;
+    std::vector<QToolButton*> highlight_swatches;
+    char last_highlight_swatch = 0;
     QAction* select_highlight_action = nullptr;
 
     // PaperNote document tabs
@@ -679,6 +683,7 @@ public:
     void create_document_tabbar();
     void refresh_document_tabbar();
     void show_preferences_dialog();
+    void update_highlight_swatch_state();
     void run_ui_command(const std::string& command);
     void goto_page_from_edit();
     void handle_goto_highlight();
