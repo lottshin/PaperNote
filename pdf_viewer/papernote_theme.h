@@ -148,6 +148,9 @@ QToolBar#papernote_toolbar QToolButton:disabled { color: @muted; }
 QToolBar#papernote_toolbar QToolButton:checked {
     background: @accentSoft; border-color: @accent; color: @accentText;
 }
+QToolBar#papernote_toolbar QToolButton::menu-indicator {
+    image: none; width: 0px;
+}
 QToolBar#papernote_toolbar::separator {
     width: 1px; background: @separator; margin: 6px 8px;
 }

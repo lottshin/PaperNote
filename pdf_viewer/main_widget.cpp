@@ -618,6 +618,15 @@ void MainWidget::handle_selection_mouse_edge_scrolling(QMouseEvent* mouse_event)
     }
 }
 
+QPoint MainWidget::event_view_pos(QMouseEvent* event) {
+    if (!opengl_widget) {
+        return event->pos();
+    }
+    // Mouse events arrive in MainWidget (QMainWindow) coordinates, which include the
+    // toolbar / tab strip. The document view starts below them, so map into its space.
+    return opengl_widget->mapFrom(this, event->pos());
+}
+
 void MainWidget::mouseMoveEvent(QMouseEvent* mouse_event) {
     if (is_pinching){
         // no need to handle move events when a pinch to zoom is in progress
@@ -635,7 +644,7 @@ void MainWidget::mouseMoveEvent(QMouseEvent* mouse_event) {
     }
 
     if (should_draw(false) && is_drawing) {
-        handle_drawing_move(mouse_event->pos(), -1.0f);
+        handle_drawing_move(event_view_pos(mouse_event), -1.0f);
         validate_render();
         return;
     }
@@ -653,14 +662,14 @@ void MainWidget::mouseMoveEvent(QMouseEvent* mouse_event) {
         }
     }
 
-    WindowPos mpos(mouse_event->pos());
+    WindowPos mpos(event_view_pos(mouse_event));
     AbsoluteDocumentPos abs_mpos = get_window_abspos(mpos);
     NormalizedWindowPos normal_mpos = mpos.to_window_normalized(main_document_view);
 
     if (freehand_drawing_move_data) {
         // update temp drawings of opengl widget
         //AbsoluteDocumentPos mouse_abspos = WindowPos(mouse_event->pos()).to_absolute(main_document_view);
-        AbsoluteDocumentPos mouse_abspos = get_window_abspos(WindowPos(mouse_event->pos()));
+        AbsoluteDocumentPos mouse_abspos = get_window_abspos(WindowPos(event_view_pos(mouse_event)));
         opengl_widget->moving_drawings.clear();
         opengl_widget->moving_pixmaps.clear();
         move_selected_drawings(mouse_abspos, opengl_widget->moving_drawings, opengl_widget->moving_pixmaps);
@@ -690,7 +699,8 @@ void MainWidget::mouseMoveEvent(QMouseEvent* mouse_event) {
             update_position_buffer();
         }
         if (was_last_mouse_down_in_ruler_next_rect || was_last_mouse_down_in_ruler_prev_rect) {
-            WindowPos current_window_pos = { mouse_event->pos().x(), mouse_event->pos().y() };
+            QPoint view_mouse = event_view_pos(mouse_event);
+            WindowPos current_window_pos = { view_mouse.x(), view_mouse.y() };
             int distance = current_window_pos.manhattan(ruler_moving_last_window_pos);
             ruler_moving_last_window_pos = current_window_pos;
             ruler_moving_distance_traveled += distance;
@@ -1393,6 +1403,7 @@ MainWidget::MainWidget(fz_context* mupdf_context,
     setMenuBar(menu_bar);
     create_main_toolbar();
     create_document_tabbar();
+
 
 
     menu_bar->stackUnder(text_command_line_edit_container);
@@ -2589,7 +2600,7 @@ void MainWidget::handle_left_click(WindowPos click_pos, bool down, bool is_shift
     if (selected_freehand_drawings) {
 
         //AbsoluteDocumentPos mpos_absolute = WindowPos(mapFromGlobal(QCursor::pos())).to_absolute(main_document_view);
-        AbsoluteDocumentPos mpos_absolute = get_window_abspos(WindowPos(mapFromGlobal(QCursor::pos())));
+        AbsoluteDocumentPos mpos_absolute = get_window_abspos(WindowPos(opengl_widget->mapFromGlobal(QCursor::pos())));
 
         if (selected_freehand_drawings->selection_absrect.contains(mpos_absolute)) {
             handle_freehand_drawing_selection_click(mpos_absolute);
@@ -3182,7 +3193,7 @@ void MainWidget::mouseReleaseEvent(QMouseEvent* mevent) {
 
 
     if (is_drawing) {
-        finish_drawing(mevent->pos());
+        finish_drawing(event_view_pos(mevent));
         invalidate_render();
         return;
     }
@@ -3216,7 +3227,7 @@ void MainWidget::mouseReleaseEvent(QMouseEvent* mevent) {
             execute_macro_if_enabled(ALT_CLICK_COMMAND);
         }
         else {
-            handle_left_click({ mevent->pos().x(), mevent->pos().y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+            handle_left_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
             if (is_select_highlight_mode && (main_document_view->selected_character_rects.size() > 0)) {
                 main_document_view->add_highlight(selection_begin, selection_end, select_highlight_type);
                 clear_selected_text();
@@ -3243,7 +3254,7 @@ void MainWidget::mouseReleaseEvent(QMouseEvent* mevent) {
             execute_macro_if_enabled(ALT_RIGHT_CLICK_COMMAND);
         }
         else {
-            handle_right_click({ mevent->pos().x(), mevent->pos().y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+            handle_right_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
         }
     }
 
@@ -3269,7 +3280,7 @@ void MainWidget::mouseReleaseEvent(QMouseEvent* mevent) {
                         execute_macro_if_enabled(MIDDLE_CLICK_COMMAND);
                     }
                     else{
-                        smart_jump_under_pos({ mevent->pos().x(), mevent->pos().y() });
+                        smart_jump_under_pos({ event_view_pos(mevent).x(), event_view_pos(mevent).y() });
                     }
                 }
             }
@@ -3303,7 +3314,7 @@ int MainWidget::update_recent_clicks(AbsoluteDocumentPos mouse_abspos) {
 
 void MainWidget::mouseDoubleClickEvent(QMouseEvent* mevent) {
     if (!TOUCH_MODE) {
-        WindowPos click_pos = { mevent->pos().x(), mevent->pos().y() };
+        WindowPos click_pos = { event_view_pos(mevent).x(), event_view_pos(mevent).y() };
         AbsoluteDocumentPos mouse_abspos = main_document_view->window_to_absolute_document_pos(click_pos);
 
         if (mevent->button() == Qt::MouseButton::LeftButton) {
@@ -3357,7 +3368,7 @@ void MainWidget::mousePressEvent(QMouseEvent* mevent) {
     }
 
     if (!TOUCH_MODE && mevent->button() == Qt::MouseButton::LeftButton) {
-        QPoint local_mpos = mapFromGlobal(QCursor::pos());
+        QPoint local_mpos = opengl_widget->mapFromGlobal(QCursor::pos());
         AbsoluteDocumentPos current_pos = WindowPos(local_mpos).to_absolute(main_document_view);
         int count = update_recent_clicks(current_pos);
 
@@ -3368,17 +3379,17 @@ void MainWidget::mousePressEvent(QMouseEvent* mevent) {
     }
 
     if (mevent->button() == Qt::MouseButton::LeftButton) {
-        handle_left_click({ mevent->pos().x(), mevent->pos().y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+        handle_left_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
     }
 
     if (mevent->button() == Qt::MouseButton::RightButton) {
-        handle_right_click({ mevent->pos().x(), mevent->pos().y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+        handle_right_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
     }
 
     if (mevent->button() == Qt::MouseButton::MiddleButton) {
         last_middle_down_time = QTime::currentTime();
         middle_click_hold_command_already_executed = false;
-        last_mouse_down_window_pos = WindowPos{ mevent->pos().x(), mevent->pos().y() };
+        last_mouse_down_window_pos = WindowPos{ event_view_pos(mevent).x(), event_view_pos(mevent).y() };
         last_mouse_down_document_virtual_offset = dv()->get_virtual_offset();
 
         AbsoluteDocumentPos abs_mpos = dv()->window_to_absolute_document_pos(last_mouse_down_window_pos);
@@ -6447,6 +6458,7 @@ void MainWidget::show_home_dialog(bool auto_show) {
         dialog.done(1);
     });
 
+
     int result = dialog.exec();
 
     if (result == 1 && !chosen_path.isEmpty()) {
@@ -7783,7 +7795,7 @@ void MainWidget::show_command_documentation(QString command_name) {
 
 
 bool MainWidget::show_contextual_context_menu() {
-    auto p = mapFromGlobal(QCursor::pos());
+    auto p = opengl_widget->mapFromGlobal(QCursor::pos());
     WindowPos window_pos = WindowPos{
         p.x(), p.y()
     };
@@ -12171,6 +12183,7 @@ void MainWidget::show_preferences_dialog() {
 
     QObject::connect(close_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(0); });
 
+
     dialog.exec();
 }
 
@@ -12504,9 +12517,13 @@ void MainWidget::create_main_toolbar() {
 
     // Single "current highlight colour" chip with a small palette menu.
     color_button = new QToolButton(main_toolbar);
-    color_button->setFixedSize(26, 26);
+    color_button->setFixedSize(24, 24);
+    color_button->setIconSize(QSize(18, 18));
     color_button->setPopupMode(QToolButton::InstantPopup);
     color_button->setToolTip("高亮颜色（点开选择颜色）");
+    color_button->setStyleSheet(
+        "QToolButton { padding: 0px; border: none; background: transparent; }"
+        "QToolButton::menu-indicator { image: none; width: 0px; }");
     QMenu* color_menu = new QMenu(color_button);
     for (char letter = 'a'; letter <= 'c'; letter++) {
         int idx = (letter - 'a') * 3;
@@ -12536,7 +12553,13 @@ void MainWidget::create_main_toolbar() {
         color_actions.push_back(action);
     }
     color_button->setMenu(color_menu);
-    main_toolbar->addWidget(color_button);
+
+    QWidget* color_wrap = new QWidget(main_toolbar);
+    QVBoxLayout* color_layout = new QVBoxLayout(color_wrap);
+    color_layout->setContentsMargins(0, 0, 0, 0);
+    color_layout->setAlignment(Qt::AlignCenter);
+    color_layout->addWidget(color_button);
+    main_toolbar->addWidget(color_wrap);
 
     add_button("bookmark", "加书签", "给当前页添加书签",
                [this]() { run_ui_command("add_bookmark"); }, false);

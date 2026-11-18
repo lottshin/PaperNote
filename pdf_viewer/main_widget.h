@@ -879,6 +879,7 @@ protected:
     void resizeEvent(QResizeEvent* resize_event) override;
     void changeEvent(QEvent* event) override;
     void mouseMoveEvent(QMouseEvent* mouse_event) override;
+    QPoint event_view_pos(QMouseEvent* mouse_event);
 
     // we already handle drag and drop on macos elsewhere
 // #ifndef Q_OS_MACOS

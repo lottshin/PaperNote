@@ -233,7 +233,59 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  extern std::wstring EXECUTE_COMMANDS[26];
  extern float HIGHLIGHT_COLORS[26 * 3];
  extern int STATUS_BAR_FONT_SIZE;
-@@ -1369,6 +1391,10 @@
+@@ -596,6 +618,15 @@
+     }
+ }
+ 
++QPoint MainWidget::event_view_pos(QMouseEvent* event) {
++    if (!opengl_widget) {
++        return event->pos();
++    }
++    // Mouse events arrive in MainWidget (QMainWindow) coordinates, which include the
++    // toolbar / tab strip. The document view starts below them, so map into its space.
++    return opengl_widget->mapFrom(this, event->pos());
++}
++
+ void MainWidget::mouseMoveEvent(QMouseEvent* mouse_event) {
+     if (is_pinching){
+         // no need to handle move events when a pinch to zoom is in progress
+@@ -613,7 +644,7 @@
+     }
+ 
+     if (should_draw(false) && is_drawing) {
+-        handle_drawing_move(mouse_event->pos(), -1.0f);
++        handle_drawing_move(event_view_pos(mouse_event), -1.0f);
+         validate_render();
+         return;
+     }
+@@ -631,14 +662,14 @@
+         }
+     }
+ 
+-    WindowPos mpos(mouse_event->pos());
++    WindowPos mpos(event_view_pos(mouse_event));
+     AbsoluteDocumentPos abs_mpos = get_window_abspos(mpos);
+     NormalizedWindowPos normal_mpos = mpos.to_window_normalized(main_document_view);
+ 
+     if (freehand_drawing_move_data) {
+         // update temp drawings of opengl widget
+         //AbsoluteDocumentPos mouse_abspos = WindowPos(mouse_event->pos()).to_absolute(main_document_view);
+-        AbsoluteDocumentPos mouse_abspos = get_window_abspos(WindowPos(mouse_event->pos()));
++        AbsoluteDocumentPos mouse_abspos = get_window_abspos(WindowPos(event_view_pos(mouse_event)));
+         opengl_widget->moving_drawings.clear();
+         opengl_widget->moving_pixmaps.clear();
+         move_selected_drawings(mouse_abspos, opengl_widget->moving_drawings, opengl_widget->moving_pixmaps);
+@@ -668,7 +699,8 @@
+             update_position_buffer();
+         }
+         if (was_last_mouse_down_in_ruler_next_rect || was_last_mouse_down_in_ruler_prev_rect) {
+-            WindowPos current_window_pos = { mouse_event->pos().x(), mouse_event->pos().y() };
++            QPoint view_mouse = event_view_pos(mouse_event);
++            WindowPos current_window_pos = { view_mouse.x(), view_mouse.y() };
+             int distance = current_window_pos.manhattan(ruler_moving_last_window_pos);
+             ruler_moving_last_window_pos = current_window_pos;
+             ruler_moving_distance_traveled += distance;
+@@ -1369,6 +1401,11 @@
      }
      menu_bar = create_main_menu_bar();
      setMenuBar(menu_bar);
@@ -241,10 +293,11 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +    create_document_tabbar();
 +
 +
++
      menu_bar->stackUnder(text_command_line_edit_container);
  #endif
  
-@@ -1883,6 +1909,37 @@
+@@ -1883,6 +1920,37 @@
  void MainWidget::validate_ui() {
      status_label_left->setText(QString::fromStdWString(get_status_string(false)));
      status_label_right->setText(QString::fromStdWString(get_status_string(true)));
@@ -282,7 +335,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
      update_command_hints_position();
      is_ui_invalidated = false;
  }
-@@ -2089,8 +2146,20 @@
+@@ -2089,8 +2157,20 @@
  
      main_document_view->on_view_size_change(main_window_width, main_window_height);
      main_document_view->open_document(path, &this->is_render_invalidated);
@@ -305,7 +358,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          return;
      }
      adjust_two_page_mode_document_zoom_and_offset(doc()->get_path());
-@@ -2111,7 +2180,7 @@
+@@ -2111,7 +2191,7 @@
      if (has_document) {
          //setWindowTitle(QString::fromStdWString(path.get_path()));
          if (file_name.size() > 0) {
@@ -314,7 +367,91 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
          }
          else {
              setWindowTitle(QString::fromStdWString(path));
-@@ -6145,6 +6214,269 @@
+@@ -2520,7 +2600,7 @@
+     if (selected_freehand_drawings) {
+ 
+         //AbsoluteDocumentPos mpos_absolute = WindowPos(mapFromGlobal(QCursor::pos())).to_absolute(main_document_view);
+-        AbsoluteDocumentPos mpos_absolute = get_window_abspos(WindowPos(mapFromGlobal(QCursor::pos())));
++        AbsoluteDocumentPos mpos_absolute = get_window_abspos(WindowPos(opengl_widget->mapFromGlobal(QCursor::pos())));
+ 
+         if (selected_freehand_drawings->selection_absrect.contains(mpos_absolute)) {
+             handle_freehand_drawing_selection_click(mpos_absolute);
+@@ -3113,7 +3193,7 @@
+ 
+ 
+     if (is_drawing) {
+-        finish_drawing(mevent->pos());
++        finish_drawing(event_view_pos(mevent));
+         invalidate_render();
+         return;
+     }
+@@ -3147,7 +3227,7 @@
+             execute_macro_if_enabled(ALT_CLICK_COMMAND);
+         }
+         else {
+-            handle_left_click({ mevent->pos().x(), mevent->pos().y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
++            handle_left_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+             if (is_select_highlight_mode && (main_document_view->selected_character_rects.size() > 0)) {
+                 main_document_view->add_highlight(selection_begin, selection_end, select_highlight_type);
+                 clear_selected_text();
+@@ -3174,7 +3254,7 @@
+             execute_macro_if_enabled(ALT_RIGHT_CLICK_COMMAND);
+         }
+         else {
+-            handle_right_click({ mevent->pos().x(), mevent->pos().y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
++            handle_right_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, false, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+         }
+     }
+ 
+@@ -3200,7 +3280,7 @@
+                         execute_macro_if_enabled(MIDDLE_CLICK_COMMAND);
+                     }
+                     else{
+-                        smart_jump_under_pos({ mevent->pos().x(), mevent->pos().y() });
++                        smart_jump_under_pos({ event_view_pos(mevent).x(), event_view_pos(mevent).y() });
+                     }
+                 }
+             }
+@@ -3234,7 +3314,7 @@
+ 
+ void MainWidget::mouseDoubleClickEvent(QMouseEvent* mevent) {
+     if (!TOUCH_MODE) {
+-        WindowPos click_pos = { mevent->pos().x(), mevent->pos().y() };
++        WindowPos click_pos = { event_view_pos(mevent).x(), event_view_pos(mevent).y() };
+         AbsoluteDocumentPos mouse_abspos = main_document_view->window_to_absolute_document_pos(click_pos);
+ 
+         if (mevent->button() == Qt::MouseButton::LeftButton) {
+@@ -3288,7 +3368,7 @@
+     }
+ 
+     if (!TOUCH_MODE && mevent->button() == Qt::MouseButton::LeftButton) {
+-        QPoint local_mpos = mapFromGlobal(QCursor::pos());
++        QPoint local_mpos = opengl_widget->mapFromGlobal(QCursor::pos());
+         AbsoluteDocumentPos current_pos = WindowPos(local_mpos).to_absolute(main_document_view);
+         int count = update_recent_clicks(current_pos);
+ 
+@@ -3299,17 +3379,17 @@
+     }
+ 
+     if (mevent->button() == Qt::MouseButton::LeftButton) {
+-        handle_left_click({ mevent->pos().x(), mevent->pos().y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
++        handle_left_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+     }
+ 
+     if (mevent->button() == Qt::MouseButton::RightButton) {
+-        handle_right_click({ mevent->pos().x(), mevent->pos().y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
++        handle_right_click({ event_view_pos(mevent).x(), event_view_pos(mevent).y() }, true, is_shift_pressed, is_control_pressed, is_command_pressed, is_alt_pressed);
+     }
+ 
+     if (mevent->button() == Qt::MouseButton::MiddleButton) {
+         last_middle_down_time = QTime::currentTime();
+         middle_click_hold_command_already_executed = false;
+-        last_mouse_down_window_pos = WindowPos{ mevent->pos().x(), mevent->pos().y() };
++        last_mouse_down_window_pos = WindowPos{ event_view_pos(mevent).x(), event_view_pos(mevent).y() };
+         last_mouse_down_document_virtual_offset = dv()->get_virtual_offset();
+ 
+         AbsoluteDocumentPos abs_mpos = dv()->window_to_absolute_document_pos(last_mouse_down_window_pos);
+@@ -6145,6 +6225,270 @@
      else {
          change_selected_highlight_type(symbol);
          return utf8_decode(doc()->get_highlight_index_uuid(selected_highlight_index));
@@ -551,6 +688,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        dialog.done(1);
 +    });
 +
++
 +    int result = dialog.exec();
 +
 +    if (result == 1 && !chosen_path.isEmpty()) {
@@ -584,7 +722,16 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
      }
  }
  
-@@ -7554,7 +7886,13 @@
+@@ -7451,7 +7795,7 @@
+ 
+ 
+ bool MainWidget::show_contextual_context_menu() {
+-    auto p = mapFromGlobal(QCursor::pos());
++    auto p = opengl_widget->mapFromGlobal(QCursor::pos());
+     WindowPos window_pos = WindowPos{
+         p.x(), p.y()
+     };
+@@ -7554,7 +7898,13 @@
              std::unique_ptr<Command> subcommand = std::get<std::unique_ptr<Command>>(std::move(subitem));
              std::string command_name = subcommand->get_human_readable_name();
  
@@ -599,7 +746,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              actions.push_back(action);
              connect(action, &QAction::triggered, [&, command_name, subcommand = std::move(subcommand)]() mutable {
                  //execute_macro_if_enabled(command_name.toStdWString());
-@@ -11547,7 +11885,7 @@
+@@ -11547,7 +11897,7 @@
              key_mappings = command_key_mappings[command];
          }
  
@@ -608,7 +755,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
  
          if (key_mappings.size() > 0){
              action_menu_name += " ( " + translate_key_mapping_to_macos(QString::fromStdString(key_mappings[0])) + " ) ";
-@@ -11567,19 +11905,711 @@
+@@ -11567,19 +11917,722 @@
  
      }
      else {
@@ -616,10 +763,10 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        auto menu = parent->addMenu(papernote_tr_menu(items->name));
          for (auto&& child : items->children) {
              create_menu_from_menu_node(menu, child, command_key_mappings);
-+        }
-+    }
-+}
-+
+         }
+     }
+ }
+ 
 +void MainWidget::run_ui_command(const std::string& command) {
 +    auto cmd = command_manager->get_command_with_name(this, command);
 +    if (cmd) {
@@ -879,6 +1026,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +
 +    QObject::connect(close_button, &QPushButton::clicked, &dialog, [&]() { dialog.done(0); });
 +
++
 +    dialog.exec();
 +}
 +
@@ -909,7 +1057,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        int page = item->data(0, Qt::UserRole).toInt();
 +        if (page >= 0) {
 +            goto_page_number(page);
-         }
++        }
 +    });
 +
 +    thumbnails = new QListWidget(sidebar_tabs);
@@ -953,13 +1101,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +void MainWidget::toggle_sidebar() {
 +    if (!sidebar) {
 +        create_sidebar();
-     }
++    }
 +    sidebar->setVisible(!sidebar->isVisible());
 +    if (sidebar->isVisible()) {
 +        refresh_sidebar();
 +    }
- }
- 
++}
++
 +void MainWidget::refresh_sidebar() {
 +    if (!sidebar || !sidebar->isVisible()) {
 +        return;
@@ -1212,9 +1360,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +
 +    // Single "current highlight colour" chip with a small palette menu.
 +    color_button = new QToolButton(main_toolbar);
-+    color_button->setFixedSize(26, 26);
++    color_button->setFixedSize(24, 24);
++    color_button->setIconSize(QSize(18, 18));
 +    color_button->setPopupMode(QToolButton::InstantPopup);
 +    color_button->setToolTip("高亮颜色（点开选择颜色）");
++    color_button->setStyleSheet(
++        "QToolButton { padding: 0px; border: none; background: transparent; }"
++        "QToolButton::menu-indicator { image: none; width: 0px; }");
 +    QMenu* color_menu = new QMenu(color_button);
 +    for (char letter = 'a'; letter <= 'c'; letter++) {
 +        int idx = (letter - 'a') * 3;
@@ -1244,7 +1396,13 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +        color_actions.push_back(action);
 +    }
 +    color_button->setMenu(color_menu);
-+    main_toolbar->addWidget(color_button);
++
++    QWidget* color_wrap = new QWidget(main_toolbar);
++    QVBoxLayout* color_layout = new QVBoxLayout(color_wrap);
++    color_layout->setContentsMargins(0, 0, 0, 0);
++    color_layout->setAlignment(Qt::AlignCenter);
++    color_layout->addWidget(color_button);
++    main_toolbar->addWidget(color_wrap);
 +
 +    add_button("bookmark", "加书签", "给当前页添加书签",
 +               [this]() { run_ui_command("add_bookmark"); }, false);
@@ -1321,7 +1479,7 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
              new MenuNode{ "open_document", "", {}},
              new MenuNode { "open_prev_doc", "", {}},
              new MenuNode { "open_document_embedded", "", {}},
-@@ -11809,21 +12839,39 @@
+@@ -11809,19 +12862,37 @@
      auto command_key_mappings = input_handler->get_command_key_mappings();
      QMenuBar* menu_bar = new QMenuBar(this);
      for (auto top_level_menu : top_level_menus) {
@@ -1353,8 +1511,8 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            "<p>在 Sioyek 基础上新增：高亮/书签导出 Markdown（Ctrl+Shift+E）、"
 +            "中文菜单与快速上手引导、全新图标与品牌名。</p>"
 +            "<p>源码：<a href='https://github.com/lottshin/PaperNote'>github.com/lottshin/PaperNote</a></p>");
-     });
- 
++    });
++
 +    // Show the Chinese quick start once, on the very first launch.
 +    QTimer::singleShot(1200, this, [this](){
 +        QSettings settings("PaperNote", "PaperNote");
@@ -1362,11 +1520,9 @@ diff --git a/pdf_viewer/main_widget.cpp b/pdf_viewer/main_widget.cpp
 +            settings.setValue("quickstart_shown", true);
 +            show_quickstart_dialog();
 +        }
-+    });
-+
+     });
+ 
      for (auto top_level_menu : top_level_menus) {
-         delete_menu_nodes(top_level_menu);
-     }
 diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
 --- a/pdf_viewer/main_widget.h
 +++ b/pdf_viewer/main_widget.h
@@ -1445,6 +1601,14 @@ diff --git a/pdf_viewer/main_widget.h b/pdf_viewer/main_widget.h
      void handle_goto_highlight();
      void handle_goto_highlight_global();
      void handle_goto_toc();
+@@ -825,6 +879,7 @@
+     void resizeEvent(QResizeEvent* resize_event) override;
+     void changeEvent(QEvent* event) override;
+     void mouseMoveEvent(QMouseEvent* mouse_event) override;
++    QPoint event_view_pos(QMouseEvent* mouse_event);
+ 
+     // we already handle drag and drop on macos elsewhere
+ // #ifndef Q_OS_MACOS
 diff --git a/pdf_viewer/config.cpp b/pdf_viewer/config.cpp
 --- a/pdf_viewer/config.cpp
 +++ b/pdf_viewer/config.cpp
@@ -1752,7 +1916,7 @@ diff --git a/pdf_viewer/papernote_theme.h b/pdf_viewer/papernote_theme.h
 new file mode 100644
 --- /dev/null
 +++ b/pdf_viewer/papernote_theme.h
-@@ -0,0 +1,387 @@
+@@ -0,0 +1,390 @@
 +#pragma once
 +
 +// PaperNote visual theme: warm-minimal light palette and a matching dark palette.
@@ -1902,6 +2066,9 @@ new file mode 100644
 +QToolBar#papernote_toolbar QToolButton:disabled { color: @muted; }
 +QToolBar#papernote_toolbar QToolButton:checked {
 +    background: @accentSoft; border-color: @accent; color: @accentText;
++}
++QToolBar#papernote_toolbar QToolButton::menu-indicator {
++    image: none; width: 0px;
 +}
 +QToolBar#papernote_toolbar::separator {
 +    width: 1px; background: @separator; margin: 6px 8px;
